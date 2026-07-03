@@ -10,7 +10,7 @@ export default function LoginPage() {
           <Home className="size-8 text-primary" />
           <span className="text-lg font-semibold">My Site</span>
         </Link>
-        <LoginForm />
+        <LoginForm className="shadow-xl" />
       </div>
     </div>
   )

@@ -10,7 +10,7 @@ export default function Page() {
           <Home className="size-8 text-primary" />
           <span className="text-lg font-semibold">My Site</span>
         </Link>
-        <SignupForm />
+        <SignupForm className="shadow-xl" />
       </div>
     </div>
   )
