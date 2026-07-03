@@ -1,4 +1,4 @@
-import { SquareStar } from 'lucide-react'
+import { Home } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '../ui/button'
 
@@ -9,7 +9,7 @@ const Header = async () => {
     <nav className="fixed z-50 h-14 w-full border bg-background dark:border-slate-700/70">
       <div className="container mx-auto flex h-full items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          <SquareStar className="size-8 text-primary" />
+          <Home className="size-8 text-primary" />
           <span className="text-lg font-semibold">My Site</span>
         </Link>
 

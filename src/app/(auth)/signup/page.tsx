@@ -1,8 +1,8 @@
-import { LoginForm } from '@/components/modules/auth/login-form'
+import { SignupForm } from '@/components/modules/auth/signup-form'
 import { Home } from 'lucide-react'
 import Link from 'next/link'
 
-export default function LoginPage() {
+export default function Page() {
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
@@ -10,7 +10,7 @@ export default function LoginPage() {
           <Home className="size-8 text-primary" />
           <span className="text-lg font-semibold">My Site</span>
         </Link>
-        <LoginForm />
+        <SignupForm />
       </div>
     </div>
   )

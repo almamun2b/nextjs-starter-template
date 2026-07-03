@@ -1,5 +1,5 @@
 import { Separator } from '@/components/ui/separator'
-import { Mail, Phone, SquareStar } from 'lucide-react'
+import { Home, Mail, Phone } from 'lucide-react'
 import Link from 'next/link'
 
 const Footer = () => {
@@ -29,7 +29,7 @@ const Footer = () => {
           <div className="md:col-span-6">
             <div className="max-w-105 space-y-6">
               <Link href="/" className="mb-4 inline-flex items-center gap-2">
-                <SquareStar className="size-8 text-primary" />
+                <Home className="size-8 text-primary" />
                 <h2 className="text-xl font-bold">My Site</h2>
               </Link>
               <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
