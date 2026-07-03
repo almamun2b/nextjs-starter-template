@@ -1,4 +1,4 @@
 {
   "**/*.{json,md,yml,yaml}": ["pnpm format"],
-  "**/*.{js,ts}": ["pnpm lint:fix", "pnpm format"]
+  "**/*.{js,ts,tsx}": ["pnpm lint:fix", "pnpm format"]
 }

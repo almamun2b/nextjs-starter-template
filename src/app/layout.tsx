@@ -1,5 +1,7 @@
+import { TooltipProvider } from '@/components/ui/tooltip'
 import type { Metadata } from 'next'
 import { Geist_Mono, Roboto } from 'next/font/google'
+import { Toaster } from 'sonner'
 import './globals.css'
 
 const robotoSans = Roboto({
@@ -28,7 +30,10 @@ export default function RootLayout({
       lang="en"
       className={`${robotoSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <TooltipProvider>{children}</TooltipProvider>
+        <Toaster />
+      </body>
     </html>
   )
 }
