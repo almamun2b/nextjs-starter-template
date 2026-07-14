@@ -2,57 +2,71 @@
 
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may differ from your training data. Read the relevant guide in node_modules/next/dist/docs/ before introducing new patterns or relying on older Next.js conventions.
 
 <!-- END:nextjs-agent-rules -->
 
 # nextjs-starter-template
 
+## Working conventions
+
+- Use pnpm for every install, run, and script. Avoid npm/yarn unless the user explicitly asks.
+- Prefer the existing abstractions in this repo over adding new ones: use the shared fetch layer, validation schemas, and UI primitives first.
+- Keep changes aligned with the App Router structure and the existing route-group layout under src/app/.
+- If a task touches auth, data fetching, or forms, inspect the matching modules in src/app/actions/, src/lib/, src/validation/, and src/components/modules/ before implementing.
+
 ## Commands
 
-- `pnpm dev` / `pnpm build` / `pnpm start` — Next.js dev/build/start
-- `pnpm lint` — ESLint (flat config, `eslint.config.mjs`)
-- `pnpm lint:fix` — ESLint with `--fix`
-- `pnpm format` — Prettier for `**/*.{ts,tsx}`
-- `pnpm typecheck` — `tsc --noEmit`
-- `pnpm prepare` — Husky install (runs post-install)
+- pnpm dev / pnpm build / pnpm start — local development and production build
+- pnpm lint — ESLint via eslint.config.mjs
+- pnpm lint:fix — auto-fix lint issues
+- pnpm format — format TypeScript/TSX files with Prettier
+- pnpm typecheck — run TypeScript type checking with tsc --noEmit
+- pnpm prepare — install Husky hooks
 
-Pre-commit hook runs `pnpm lint-staged` → lints + formats staged files.
-Run order: `lint:fix` → `format` → `typecheck`.
+The pre-commit flow runs lint-staged checks and then format/typecheck. No dedicated test runner is installed, so do not assume a test command exists.
 
-No test framework is installed — no test commands.
+## Stack and project expectations
 
-## Stack
+- Next.js 16.2.9 with the App Router and React 19.2.4
+- Tailwind CSS v4; use the import-based setup from the global stylesheet and keep class names consistent with the existing utility patterns
+- shadcn/ui primitives live under src/components/ui/ and should be reused rather than reimplemented
+- Zod v4 is used, but the project imports from zod/v3 for the compatible API surface in src/validation/
 
-- **Next.js 16.2.9** (App Router, `reactCompiler: true` in `next.config.ts`)
-- **React 19.2.4**
-- **Tailwind CSS v4** — use `@import "tailwindcss"`, NOT `@tailwind base/components/utilities`. PostCSS plugin: `@tailwindcss/postcss` (v4).
-- **shadcn/ui** — style `radix-nova` (not default). Config in `components.json`.
-- **pnpm** — only package manager.
-- **Zod v4** — import from `zod/v3` for v3-compat API (`src/validation/`).
+## Architecture notes
 
-## API / Data Layer
+- Public routes live under src/app/(public)/, auth routes under src/app/(auth)/, and authenticated dashboard routes under src/app/(dashboard)/.
+- Route-specific UI should stay close to its route; feature components belong in src/components/modules/ and shared cross-cutting UI in src/components/shared/.
+- Server Actions belong in src/app/actions/ and should be the default place for auth-related mutations and backend calls from forms.
+- Client-side data fetching should normally go through the shared fetch layer in src/lib/ rather than ad hoc fetch calls.
 
-- All client-side API calls go through `src/lib/fetch/$fetch.ts`, which points at `{NEXT_PUBLIC_SITE_URL}/server` (Next.js rewrite in `next.config.ts`). The rewrite maps `/server/:path*` → `{NEXT_PUBLIC_API_URL || http://localhost:5000}/api/v1/:path*`.
-- `src/lib/fetch/index.ts` exports `createFetch()` and a bare `$fetch` instance. The project uses a configured instance from `src/lib/fetch/$fetch.ts`.
-- Auto token refresh on 401 via `onError` interceptor in `$fetch.ts`.
-- Server Actions in `src/app/actions/` use `$fetch` + `revalidateTag`.
-- `src/lib/fetch/useFetch.ts` — `useFetch` hook for client-side async state management (loading/success/error, manual or automatic execution).
+## Data layer and API conventions
 
-## Code Style
+- The frontend API client is configured in src/lib/$fetch.ts and the shared fetch helpers under src/lib/fetch/.
+- Requests should use the shared $fetch instance or createFetch() helpers instead of calling fetch directly in components.
+- The rewrite in next.config.ts maps /server/:path\* to the backend API base, so prefer that path when a client-side call needs to reach the proxy layer.
+- Authentication refresh and cookie propagation are already handled in src/lib/$fetch.ts; do not duplicate that logic in new features.
+- Server Actions commonly combine $fetch with revalidateTag from next/cache for cache invalidation.
+- For client-side async state, prefer the useFetch hook in src/lib/fetch/use-fetch.ts rather than adding custom loading/error state logic.
 
-- **No semicolons**, single quotes, trailing commas (es5). Prettier with `prettier-plugin-tailwindcss` for class sorting.
-- Path alias: `@/*` → `./src/*`.
-- `cn()` utility in `src/lib/utils.ts` (clsx + tailwind-merge).
-- VSCode format-on-save + auto-organize imports.
+## Forms, validation, and types
 
-## Project Structure
+- Validation schemas belong in src/validation/ and should be reused by forms and actions.
+- Auth-related request/response shapes live in src/types/; keep new types there or in the nearest feature-specific type module.
+- Forms in this project already use react-hook-form plus zodResolver; follow that pattern instead of introducing a new form library.
+- Reuse the shared form helpers in src/components/shared/FormController.tsx when adding form fields that follow the existing structure.
 
-- `src/app/(public)/` — public routes (home page)
-- `src/app/(auth)/` — auth routes (login, signup)
-- `src/app/(dashboard)/` — authenticated routes (dashboard, users, settings, profile)
-- `src/components/ui/` — shadcn primitives
-- `src/components/modules/` — feature-specific components
-- `src/lib/fetch/` — custom fetch wrapper + useFetch hook
-- `src/app/actions/` — Server Actions (auth, user)
-- `src/validation/` — Zod schemas
+## Styling and code style
+
+- Follow the existing formatting conventions: no semicolons, single quotes, trailing commas, and Prettier-driven formatting.
+- Use the path alias @/_ for imports to src/_.
+- Use the cn() helper from src/lib/utils.ts for className composition.
+- Keep Tailwind classes organized and avoid introducing ad hoc styling systems.
+- Follow the existing component style: small, composable UI components with props passed through clearly.
+
+## When making changes
+
+- Prefer minimal, localized edits that fit the current structure.
+- If a new feature needs API access, add or reuse the appropriate server action and type definitions before wiring up UI.
+- If you introduce a new route, place it in the matching route group and keep the layout behavior consistent with the existing auth/dashboard/public boundaries.
+- Do not add a test framework unless the user explicitly asks; the repo currently has no test workflow.
