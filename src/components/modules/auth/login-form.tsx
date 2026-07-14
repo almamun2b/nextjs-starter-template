@@ -1,5 +1,6 @@
 'use client'
 
+import { loginUser } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -17,31 +18,16 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { TLoginForm } from '@/types/auth.types'
+import { loginFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { Controller, useForm } from 'react-hook-form'
-import z from 'zod/v3'
 
-type LoginFormProps = React.ComponentProps<'div'>
+type TLoginFormProps = React.ComponentProps<'div'>
 
-const loginFormSchema = z.object({
-  email: z
-    .string()
-    .min(1, { message: 'Email is required' })
-    .email({ message: 'Invalid email address' })
-    .trim()
-    .toLowerCase(),
-
-  password: z
-    .string()
-    .min(8, { message: 'Password must be at least 6 characters long' })
-    .max(128, { message: 'Password must not exceed 128 characters' }),
-})
-
-export type LoginFormValues = z.infer<typeof loginFormSchema>
-
-export function LoginForm({ ...props }: LoginFormProps) {
-  const form = useForm<LoginFormValues>({
+export function LoginForm({ ...props }: TLoginFormProps) {
+  const form = useForm<TLoginForm>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
       email: '',
@@ -50,9 +36,13 @@ export function LoginForm({ ...props }: LoginFormProps) {
     mode: 'onChange',
   })
 
-  const onSubmit = (data: LoginFormValues) => {
-    console.log('Form submitted:', data)
-    form.reset()
+  const onSubmit = async (data: TLoginForm) => {
+    try {
+      const response = await loginUser(data)
+      console.log('Login response:', response)
+    } catch (error) {
+      console.log('Login error:', error)
+    }
   }
   return (
     <Card {...props}>

@@ -1,0 +1,34 @@
+interface IMeta {
+  limit: number
+  page: number
+  total: number
+  totalPage: number
+}
+
+type SortOrder = 'asc' | 'desc'
+
+type CursorSortDirection = 'forward' | 'backward'
+
+interface IMetaCursor {
+  limit: number
+  nextCursor: string | null
+  prevCursor: string | null
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
+
+interface IErrors {
+  field: string | null
+  message: string
+}
+
+interface IResponse {
+  statusCode: number
+  success: boolean
+  message: string
+  timestamp: string
+  path: string
+  errors?: IErrors[] | null
+}
+
+export type { CursorSortDirection, IMeta, IMetaCursor, IResponse, SortOrder }

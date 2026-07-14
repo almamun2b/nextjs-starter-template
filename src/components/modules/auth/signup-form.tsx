@@ -16,63 +16,16 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { TRegisterForm } from '@/types/auth.types'
+import { registerFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { Controller, useForm } from 'react-hook-form'
-import { z } from 'zod/v3'
 
-type SignupFormProps = React.ComponentProps<'div'>
+type TSignupFormProps = React.ComponentProps<'div'>
 
-const registerFormSchema = z
-  .object({
-    firstName: z
-      .string()
-      .min(1, { message: 'First name is required' })
-      .max(50, { message: 'First name must be under 50 characters' })
-      .trim(),
-
-    lastName: z
-      .string()
-      .min(1, { message: 'Last Name is required' })
-      .max(50, { message: 'Last Name must be under 50 characters' })
-      .trim(),
-
-    email: z
-      .string()
-      .min(1, { message: 'Email is required' })
-      .email({ message: 'Invalid email address' })
-      .trim()
-      .toLowerCase(),
-
-    password: z
-      .string()
-      .min(1, { message: 'Password is required' })
-      .min(8, { message: 'Password must be at least 8 characters' })
-      .max(100, { message: 'Password is too long' })
-      .regex(/[A-Z]/, {
-        message: 'Password must contain at least one uppercase letter',
-      })
-      .regex(/[a-z]/, {
-        message: 'Password must contain at least one lowercase letter',
-      })
-      .regex(/[0-9]/, { message: 'Password must contain at least one number' })
-      .regex(/[^A-Za-z0-9]/, {
-        message: 'Password must contain at least one special character',
-      }),
-
-    confirmPassword: z
-      .string()
-      .min(1, { message: 'Please confirm your password' }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  })
-
-export type RegisterFormValues = z.infer<typeof registerFormSchema>
-
-export function SignupForm({ ...props }: SignupFormProps) {
-  const form = useForm<RegisterFormValues>({
+export function SignupForm({ ...props }: TSignupFormProps) {
+  const form = useForm<TRegisterForm>({
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
       firstName: '',
@@ -84,7 +37,7 @@ export function SignupForm({ ...props }: SignupFormProps) {
     mode: 'onChange',
   })
 
-  const onSubmit = (data: RegisterFormValues) => {
+  const onSubmit = (data: TRegisterForm) => {
     console.log('Form submitted:', data)
     form.reset()
   }

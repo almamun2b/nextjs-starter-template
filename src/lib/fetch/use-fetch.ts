@@ -2,33 +2,77 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+/** Lifecycle state of a `useFetch`-managed call. */
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
 
+/**
+ * Options accepted by {@link useFetch}.
+ *
+ * @typeParam TData - The type of the data resolved by `action`.
+ * @typeParam TArgs - The argument tuple type accepted by `action`.
+ */
 export interface UseFetchOptions<TData, TArgs extends unknown[]> {
+  /**
+   * The async function to run — typically a Next.js Server Action, or a
+   * client call through `$fetch`/a `createFetch()` instance.
+   */
   action: (...args: TArgs) => Promise<TData>
+  /** When `true`, `action` is automatically invoked once on mount (using `args`, if provided). Defaults to `false`. */
   immediate?: boolean
+  /** Default arguments used for the automatic `immediate` call, and as a fallback when `execute()` is called with no arguments. */
   args?: TArgs
+  /** Called after `action` resolves successfully, with the resolved data. */
   onSuccess?: (data: TData) => void | Promise<void>
+  /** Called after `action` rejects, with the error normalized to an `Error` instance. */
   onError?: (error: Error) => void | Promise<void>
 }
 
+/**
+ * The state and controls returned by {@link useFetch}.
+ *
+ * @typeParam TData - The type of the data resolved by `action`.
+ * @typeParam TArgs - The argument tuple type accepted by `action`.
+ */
 export interface UseFetchResult<TData, TArgs extends unknown[]> {
+  /** The last successfully resolved value, or `null` before the first success (or after {@link UseFetchResult.reset | reset}). */
   data: TData | null
+  /** The last error, normalized to an `Error` instance, or `null` if the last call succeeded (or none has run yet). */
   error: Error | null
+  /** The current lifecycle status. */
   status: FetchStatus
+  /** Convenience boolean, equivalent to `status === 'loading'`. */
   isLoading: boolean
+  /** Convenience boolean, equivalent to `status === 'success'`. */
   isSuccess: boolean
+  /** Convenience boolean, equivalent to `status === 'error'`. */
   isError: boolean
+  /**
+   * Runs `action`. If called with no arguments, falls back to the `args`
+   * option (or an empty argument list). Updates `data`/`error`/`status`
+   * only while the component is still mounted, but always resolves/rejects
+   * with the actual result regardless of mount state.
+   */
   execute: (...args: TArgs | []) => Promise<TData>
+  /** Resets `data`, `error`, and `status` back to their initial (`null`/`null`/`'idle'`) values. */
   reset: () => void
 }
 
 /**
  * A highly reusable, type-safe custom React hook for executing React Server Actions
- * with built-in state management (loading, error, success states, data).
+ * (or any async function, such as an `$fetch`/`createFetch()` call) with built-in
+ * state management (loading, error, success states, data).
  *
  * @template TData The type of the data returned by the Server Action.
  * @template TArgs The argument types tuple of the Server Action.
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading, isError, execute } = useFetch({
+ *   action: (page: number) => api.get<PreordersResponse>('/preorders', { params: { page } }).then(r => r.data),
+ * })
+ *
+ * <button onClick={() => execute(1)} disabled={isLoading}>Load</button>
+ * ```
  */
 export function useFetch<TData, TArgs extends unknown[]>(
   options: UseFetchOptions<TData, TArgs>
