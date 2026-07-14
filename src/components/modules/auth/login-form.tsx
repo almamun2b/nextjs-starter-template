@@ -18,7 +18,7 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { TLoginForm } from '@/types/auth.types'
+import { TLoginInput } from '@/types/auth.types'
 import { loginFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
@@ -27,7 +27,7 @@ import { Controller, useForm } from 'react-hook-form'
 type TLoginFormProps = React.ComponentProps<'div'>
 
 export function LoginForm({ ...props }: TLoginFormProps) {
-  const form = useForm<TLoginForm>({
+  const form = useForm<TLoginInput>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
       email: '',
@@ -36,7 +36,7 @@ export function LoginForm({ ...props }: TLoginFormProps) {
     mode: 'onChange',
   })
 
-  const onSubmit = async (data: TLoginForm) => {
+  const onSubmit = async (data: TLoginInput) => {
     try {
       const response = await loginUser(data)
       console.log('Login response:', response)

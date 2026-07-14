@@ -74,27 +74,19 @@ No dependencies beyond TypeScript + the native `fetch`/`Headers`/`Response` type
 
 ```ts
 import { $fetch } from '@/lib/fetch'
+import type { TLoginInput } from '@/types/auth.types'
+import type { TUserResponse } from '@/types/user.types'
 
-interface LoginResponse {
-  token: string
-  user: { id: string; name: string }
-}
-
-interface LoginBody {
-  email: string
-  password: string
-}
-
-const { data, status, ok } = await $fetch<LoginResponse, LoginBody>(
+const { data, status, ok } = await $fetch<TUserResponse, TLoginInput>(
   '/auth/login',
   {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL,
+    baseUrl: process.env.NEXT_PUBLIC_SITE_URL,
     method: 'POST',
-    body: { email: 'a@b.com', password: 'secret' },
+    body: { email: 'alice@example.com', password: 'SecurePass1!' },
   }
 )
 
-console.log(data.token) // fully typed as `string`
+console.log(data.data.email) // fully typed as `string`
 ```
 
 ---
@@ -131,22 +123,13 @@ Use this when you don't need shared defaults — every call is fully self-contai
 
 ```ts
 import { $fetch } from '@/lib/fetch'
-
-interface PreordersResponse {
-  items: { id: string; sku: string }[]
-  total: number
-}
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
 // NOTE: use `type`, not `interface`, for params types — see callout below
-type PreordersQueryParams = {
-  page: number
-  limit?: number
-}
-
-const { data } = await $fetch<PreordersResponse, unknown, PreordersQueryParams>(
-  '/preorders',
+const { data } = await $fetch<TUsersResponse, unknown, TUserQueryOptions>(
+  '/users',
   {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL,
+    baseUrl: process.env.NEXT_PUBLIC_SITE_URL,
     method: 'GET',
     params: { page: 1, limit: 20 },
     next: { revalidate: 60 },
@@ -159,9 +142,7 @@ const { data } = await $fetch<PreordersResponse, unknown, PreordersQueryParams>(
 You can also pass an **absolute** URL and skip `baseUrl` entirely:
 
 ```ts
-const { data } = await $fetch<PreordersResponse>(
-  'https://api.example.com/preorders'
-)
+const { data } = await $fetch<TUsersResponse>('https://api.example.com/users')
 ```
 
 ### 2. `createFetch()` — a preconfigured instance
@@ -199,10 +180,11 @@ Then use `api` **exactly like `$fetch`** anywhere in your app — relative paths
 
 ```ts
 import { api } from '@/lib/api'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
-const { data } = await api<PreordersResponse, unknown, PreordersQueryParams>(
-  '/preorders',
-  { params: { page: 1 } }
+const { data } = await api<TUsersResponse, unknown, TUserQueryOptions>(
+  '/users',
+  { params: { page: 1, limit: 20 } }
 )
 ```
 
@@ -215,61 +197,69 @@ Passing any property in a call to `api` **overrides** the corresponding instance
 Both `$fetch` and any `createFetch()`-created instance expose `.get`, `.post`, `.put`, `.patch`, `.delete`, and `.head`. `method` is fixed internally, so it's **omitted** from the options type — you never pass `method` yourself with these.
 
 ```ts
+import type {
+  TUsersResponse,
+  TUserQueryOptions,
+  TUserResponse,
+  TCreateUserInput,
+  TUpdateProfileInput,
+} from '@/types/user.types'
+
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+
 // GET — bodyless, so only TResponse and TParams are generic
-const { data: preorders } = await $fetch.get<
-  PreordersResponse,
-  PreordersQueryParams
->('/preorders', {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL,
-  params: { page: 1 },
-})
-
-// POST — body-carrying, so TResponse, TBody, TParams
-const { data: created } = await $fetch.post<
-  PreorderDetailResponse,
-  PreorderInput
->('/preorders', {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL,
-  body: { sku: 'ABC-1', quantity: 2 },
-})
-
-// PUT
-await $fetch.put<PreorderDetailResponse, PreorderInput>('/preorders/123', {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL,
-  body: { quantity: 5 },
-})
-
-// PATCH
-await $fetch.patch<PreorderDetailResponse, Partial<PreorderInput>>(
-  '/preorders/123',
+const { data: users } = await $fetch.get<TUsersResponse, TUserQueryOptions>(
+  '/users',
   {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL,
-    body: { quantity: 3 },
+    baseUrl,
+    params: { page: 1, limit: 20 },
   }
 )
 
-// DELETE
-await $fetch.delete<{ success: boolean }>('/preorders/123', {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL,
+// POST — body-carrying, so TResponse, TBody, TParams
+const { data: created } = await $fetch.post<TUserResponse, TCreateUserInput>(
+  '/users',
+  {
+    baseUrl,
+    body: { email: 'alice@example.com', password: 'SecurePass1!' },
+  }
+)
+
+// PUT — full replacement
+await $fetch.put<TUserResponse, TCreateUserInput>('/users/abc123', {
+  baseUrl,
+  body: { email: 'alice@example.com', password: 'SecurePass1!' },
 })
 
-// HEAD
-const { headers } = await $fetch.head('/preorders/123', {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL,
+// PATCH — partial update
+await $fetch.patch<TUserResponse, TUpdateProfileInput>('/users/me', {
+  baseUrl,
+  body: { firstName: 'Alice', bio: 'Engineer' },
 })
+
+// DELETE
+await $fetch.delete<TUserResponse>('/users/abc123', { baseUrl })
+
+// HEAD
+const { headers } = await $fetch.head('/users/me', { baseUrl })
 ```
 
 The same shorthands work on a `createFetch()` instance — `baseUrl` and other defaults are inherited automatically:
 
 ```ts
-export const api = createFetch({ baseUrl: process.env.NEXT_PUBLIC_API_URL })
+import { createFetch } from '@/lib/fetch'
+import type {
+  TUsersResponse,
+  TUserResponse,
+  TCreateUserInput,
+} from '@/types/user.types'
 
-const { data } = await api.get<PreordersResponse>('/preorders')
-const { data: created } = await api.post<PreorderDetailResponse, PreorderInput>(
-  '/preorders',
-  {
-    body: { sku: 'ABC-1', quantity: 2 },
-  }
+export const api = createFetch({ baseUrl: process.env.NEXT_PUBLIC_SITE_URL })
+
+const { data: users } = await api.get<TUsersResponse>('/users')
+const { data: newUser } = await api.post<TUserResponse, TCreateUserInput>(
+  '/users',
+  { body: { email: 'bob@example.com', password: 'SecurePass2!' } }
 )
 ```
 
@@ -280,17 +270,19 @@ const { data: created } = await api.post<PreorderDetailResponse, PreorderInput>(
 Pass a plain object via `params` — it's serialized automatically:
 
 ```ts
-await $fetch('/preorders', {
+import type { TUserQueryOptions } from '@/types/user.types'
+
+await $fetch<unknown, unknown, TUserQueryOptions>('/users', {
   baseUrl,
   params: {
     page: 2, // number  -> "2"
-    active: true, // boolean -> "true"
-    tags: ['urgent', 'vip'], // array   -> repeated keys: tag=urgent&tag=vip
-    skip: undefined, // omitted entirely
-    limit: null, // omitted entirely
+    limit: 20, // number  -> "20"
+    searchTerm: 'alice', // string -> "alice"
+    role: undefined, // omitted entirely
+    isVerified: null, // omitted entirely
   },
 })
-// -> /preorders?page=2&active=true&tags=urgent&tags=vip
+// -> /users?page=2&limit=20&searchTerm=alice
 ```
 
 Serialization rules:
@@ -310,16 +302,25 @@ If `input` already contains a query string, it's preserved and merged with `para
 Pass `body` in whatever shape makes sense — it's serialized based on its type:
 
 ```ts
+import type { TCreateUserInput } from '@/types/user.types'
+import type { TLoginInput } from '@/types/auth.types'
+
 // Plain object -> JSON.stringify'd automatically, Content-Type: application/json set
-await $fetch.post('/users', {
+await $fetch.post<unknown, TLoginInput>('/auth/login', {
   baseUrl,
-  body: { name: 'Alice', joined: '2026-01-01T00:00:00.000Z' },
+  body: { email: 'alice@example.com', password: 'SecurePass1!' },
+})
+
+// POST create user
+await $fetch.post<unknown, TCreateUserInput>('/users', {
+  baseUrl,
+  body: { email: 'bob@example.com', password: 'SecurePass2!', role: 'USER' },
 })
 
 // FormData -> passed through untouched, Content-Type left alone (correct multipart boundary)
 const form = new FormData()
 form.append('avatar', file)
-await $fetch.post('/users/avatar', { baseUrl, body: form })
+await $fetch.patch('/users/me/avatar', { baseUrl, body: form })
 
 // Blob / ArrayBuffer / URLSearchParams / ReadableStream / string -> all passed through untouched
 await $fetch.post('/upload', { baseUrl, body: someBlob })
@@ -351,13 +352,12 @@ interface FetchResponse<TResponse> {
 ```
 
 ```ts
-const { data, status, ok, message } = await $fetch<PreordersResponse>(
-  '/preorders',
-  { baseUrl }
-)
+const { data, status, ok, message } = await $fetch<TUsersResponse>('/users', {
+  baseUrl,
+})
 
 if (ok) {
-  console.log(data.items)
+  console.log(data.data)
 } else {
   console.log(status, message)
 }
@@ -382,7 +382,7 @@ When the response resolves with `ok === false`, `$fetch` throws a `FetchError` c
 import { $fetch, FetchError } from '@/lib/fetch'
 
 try {
-  await $fetch('/preorders/999', { baseUrl })
+  await $fetch('/users/999', { baseUrl })
 } catch (error) {
   if (error instanceof FetchError) {
     console.log(error.status) // 404
@@ -400,7 +400,7 @@ try {
 
 ```ts
 try {
-  await $fetch('/preorders', { baseUrl, signal: controller.signal })
+  await $fetch('/users', { baseUrl, signal: controller.signal })
 } catch (error) {
   // error here could be a raw DOMException('AbortError') or TypeError — untouched
 }
@@ -458,11 +458,11 @@ const api = createFetch({
 Runs only when `response.ok === true`, after the body has been fully parsed into a `FetchResponse`. Use it to reshape or unwrap the result.
 
 ```ts
-const { data } = await $fetch<{ result: PreordersResponse }>('/preorders', {
+const { data } = await $fetch<{ result: TUsersResponse }>('/users', {
   baseUrl,
   onSuccess: (res) => {
     // unwrap an API envelope, e.g. { result: {...}, meta: {...} }
-    return { ...res, data: res.data.result as unknown as PreordersResponse }
+    return { ...res, data: res.data.result as unknown as TUsersResponse }
   },
 })
 ```
@@ -473,12 +473,15 @@ Runs whenever a request fails — either an HTTP-level failure (`error` is a `Fe
 
 ```ts
 // Recover from a 404 with a default value instead of throwing
-const { data } = await $fetch<PreordersResponse>('/preorders', {
+const { data } = await $fetch<TUsersResponse>('/users', {
   baseUrl,
   onError: (error) => {
     if (error instanceof FetchError && error.status === 404) {
       return {
-        data: { items: [], total: 0 },
+        data: {
+          data: [],
+          meta: { page: 1, limit: 20, total: 0, totalPage: 0 },
+        },
         response: error.response,
         status: 404,
         statusText: error.statusText,
@@ -517,7 +520,7 @@ const api = createFetch({
   },
 })
 
-await api('/preorders', {
+await api('/users', {
   onRequest: (req) => {
     console.log('2. call-level onRequest')
     return req
@@ -537,7 +540,7 @@ const api = createFetch({
   },
 })
 
-await api('/preorders', {
+await api('/users', {
   onError: (error) => {
     // this REPLACES the instance-level onError above for this call
     return fallbackValue
@@ -568,13 +571,13 @@ Since `FetchConfig` extends the native `RequestInit`, Next.js's server-side `nex
 
 ```ts
 // Revalidate this cached response every 60 seconds
-await $fetch('/preorders', { baseUrl, next: { revalidate: 60 } })
+await $fetch('/users', { baseUrl, next: { revalidate: 60 } })
 
-// Tag it for on-demand revalidation via revalidateTag('preorders')
-await $fetch('/preorders', { baseUrl, next: { tags: ['preorders'] } })
+// Tag it for on-demand revalidation via revalidateTag('users')
+await $fetch('/users', { baseUrl, next: { tags: ['users'] } })
 
 // Opt out of caching entirely
-await $fetch('/preorders', { baseUrl, cache: 'no-store' })
+await $fetch('/users', { baseUrl, cache: 'no-store' })
 ```
 
 These options are server-only; on the client they're simply ignored, matching Next.js's own `fetch` behavior.
@@ -622,20 +625,24 @@ function useFetch<TData, TArgs extends unknown[]>(
 'use client'
 
 import { useFetch } from '@/lib/fetch'
-import { createPreorder, type PreorderInput } from '@/features/preorders/api'
+import { loginUser } from '@/app/actions/auth'
+import type { TLoginInput } from '@/types/auth.types'
 
-export function CreatePreorderButton({ input }: { input: PreorderInput }) {
+export function LoginButton({ data }: { data: TLoginInput }) {
   const { execute, isLoading, isError, error } = useFetch({
-    action: (body: PreorderInput) => createPreorder(body).then((r) => r.data),
+    action: (input: TLoginInput) => loginUser(input),
+    onSuccess: () => {
+      window.location.assign('/dashboard')
+    },
   })
 
   return (
     <div>
       <button
-        onClick={() => execute(input).catch(() => {})}
+        onClick={() => execute(data).catch(() => {})}
         disabled={isLoading}
       >
-        {isLoading ? 'Creating…' : 'Create Preorder'}
+        {isLoading ? 'Signing in…' : 'Sign in'}
       </button>
       {isError && <p>Failed: {error?.message}</p>}
     </div>
@@ -651,16 +658,17 @@ Set `immediate: true` and provide `args` (or none, if `action` takes no argument
 'use client'
 
 import { useFetch } from '@/lib/fetch'
-import { getPreorders, type PreordersResponse } from '@/features/preorders/api'
+import { getAllUsers } from '@/app/actions/user'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
-export function PreordersList() {
+export function UsersList() {
   const { data, isLoading, isError, error } = useFetch<
-    PreordersResponse,
-    [number]
+    TUsersResponse,
+    [TUserQueryOptions]
   >({
-    action: (page) => getPreorders({ page }).then((r) => r.data),
+    action: (params) => getAllUsers(params),
     immediate: true,
-    args: [1],
+    args: [{ page: 1, limit: 20 }],
   })
 
   if (isLoading) return <p>Loading…</p>
@@ -668,10 +676,8 @@ export function PreordersList() {
 
   return (
     <ul>
-      {data?.items.map((p) => (
-        <li key={p.id}>
-          {p.sku} × {p.quantity}
-        </li>
+      {data?.data.map((u) => (
+        <li key={u.id}>{u.email}</li>
       ))}
     </ul>
   )
@@ -683,15 +689,18 @@ export function PreordersList() {
 `execute(...)` accepts arguments matching `action`'s signature. If called with no arguments, it falls back to the `args` option (useful for "refresh with the same params" buttons):
 
 ```tsx
-const { execute } = useFetch<PreordersResponse, [number]>({
-  action: (page) => getPreorders({ page }).then((r) => r.data),
-  args: [1],
+import { getAllUsers } from '@/app/actions/user'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
+
+const { execute } = useFetch<TUsersResponse, [TUserQueryOptions]>({
+  action: (params) => getAllUsers(params),
+  args: [{ page: 1, limit: 20 }],
 })
 
-// explicit page
-await execute(2)
+// explicit params
+await execute({ page: 2, limit: 10 })
 
-// falls back to `args` -> page 1
+// falls back to `args` -> page 1, limit 20
 await execute()
 ```
 
@@ -700,10 +709,13 @@ await execute()
 Useful for side effects like toasts, redirects, or cache invalidation, alongside the returned `data`/`error` state:
 
 ```tsx
-const { execute } = useFetch({
-  action: (body: PreorderInput) => createPreorder(body).then((r) => r.data),
-  onSuccess: (data) => {
-    toast.success(`Preorder ${data.id} created`)
+import { updateMyProfile } from '@/app/actions/user'
+import type { TUserResponse, TUpdateProfileInput } from '@/types/user.types'
+
+const { execute } = useFetch<TUserResponse, [TUpdateProfileInput]>({
+  action: (data) => updateMyProfile(data),
+  onSuccess: (updated) => {
+    toast.success(`Profile updated: ${updated.data.email}`)
   },
   onError: (error) => {
     toast.error(error.message)
@@ -714,7 +726,9 @@ const { execute } = useFetch({
 ### Resetting state
 
 ```tsx
-const { execute, reset, status } = useFetch({ action: createPreorder })
+import { updateMyProfile } from '@/app/actions/user'
+
+const { execute, reset, status } = useFetch({ action: updateMyProfile })
 
 // e.g. clear a success/error banner when a modal closes
 useEffect(() => {
@@ -730,20 +744,17 @@ Since `action` is just `(...args) => Promise<TData>`, it composes naturally with
 'use client'
 
 import { useFetch } from '@/lib/fetch'
-import { api } from '@/lib/api'
-import type {
-  PreordersResponse,
-  PreordersQueryParams,
-} from '@/features/preorders/api'
+import { $fetch } from '@/lib/$fetch'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
-export function PreordersList() {
+export function UsersList() {
   const { data, isLoading, isError } = useFetch<
-    PreordersResponse,
-    [PreordersQueryParams]
+    TUsersResponse,
+    [TUserQueryOptions]
   >({
     action: (params) =>
-      api
-        .get<PreordersResponse, PreordersQueryParams>('/preorders', { params })
+      $fetch
+        .get<TUsersResponse, TUserQueryOptions>('/users', { params })
         .then((r) => r.data),
     immediate: true,
     args: [{ page: 1, limit: 20 }],
@@ -767,7 +778,7 @@ A common pattern: your backend issues an `accessToken` and `refreshToken` as **h
 | `Set-Cookie` response stored automatically? | **Yes, automatically** — the browser stores it                                      | **No.** You must manually read `response.headers.getSetCookie()` and write each cookie back with Next's `cookies().set(...)`.                                 |
 | Where can cookies be written?               | N/A (browser handles it)                                                            | Only inside a **Server Action** or **Route Handler** — a Server Component's render is read-only and will throw if you try to call `cookies().set(...)` there. |
 
-> **Next.js version note:** `cookies()` from `next/headers` is synchronous in Next.js 13/14 and **async in Next.js 15+** (`await cookies()`). The examples below use the sync form — add `await` if you're on 15+.
+> **Next.js version note:** `cookies()` from `next/headers` returns an **async** cookie store in Next.js 15+ (this project uses **Next.js 16**), so all examples below use `await cookies()`. See [README-AUTH.md](./README-AUTH.md) for the full cookie-forwarding pattern.
 
 ### Client Components (Browser) — cookies are automatic
 
@@ -858,13 +869,13 @@ Once `credentials: 'include'` is set (either as an instance default, as above, o
 
 ```ts
 // the browser attaches accessToken/refreshToken cookies automatically
-const { data } = await api.get<PreordersResponse>('/preorders')
+const { data } = await api.get<TUsersResponse>('/users')
 ```
 
 If you're calling `$fetch` directly instead of through a `createFetch()` instance, just pass it per-call:
 
 ```ts
-await $fetch('/preorders', { baseUrl, credentials: 'include' })
+await $fetch('/users', { baseUrl, credentials: 'include' })
 ```
 
 #### 3. Silent refresh on a `401` (client-side)
@@ -906,13 +917,14 @@ export async function withAuthRetry<T>(request: () => Promise<T>): Promise<T> {
 ```
 
 ```ts
-// features/preorders/api.ts
+// features/users/api.ts
 import { api } from '@/lib/api'
 import { withAuthRetry } from '@/lib/auth-refresh'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
-export function getPreorders(params: PreordersQueryParams) {
+export function getUsers(params: TUserQueryOptions) {
   return withAuthRetry(() =>
-    api.get<PreordersResponse, PreordersQueryParams>('/preorders', { params })
+    api.get<TUsersResponse, TUserQueryOptions>('/users', { params })
   )
 }
 ```
@@ -921,7 +933,7 @@ If the refresh call itself fails (refresh token expired/invalid too), `withAuthR
 
 ```ts
 try {
-  const { data } = await getPreorders({ page: 1 })
+  const { data } = await getUsers({ page: 1 })
 } catch (error) {
   if (error instanceof FetchError && error.status === 401) {
     router.push('/login')
@@ -964,18 +976,19 @@ export function logout() {
 'use client'
 
 import { useFetch } from '@/lib/fetch'
-import { getPreorders } from '@/features/preorders/api'
+import { getUsers } from '@/features/users/api'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
-export function PreordersList() {
+export function UsersList() {
   const { data, isLoading, isError, error } = useFetch<
-    PreordersResponse,
-    [PreordersQueryParams]
+    TUsersResponse,
+    [TUserQueryOptions]
   >({
-    action: (params) => getPreorders(params).then((r) => r.data),
+    action: (params) => getUsers(params).then((r) => r.data),
     immediate: true,
     args: [{ page: 1 }],
     onError: (err) => {
-      // e.g. redirect on final auth failure after the retry already happened inside getPreorders
+      // e.g. redirect on final auth failure after the retry already happened inside getUsers
       if (err.message.includes('401')) router.push('/login')
     },
   })
@@ -1026,17 +1039,18 @@ export function createServerApi() {
 Server Components can only **read** cookies (via the helper above), never write them:
 
 ```tsx
-// app/preorders/page.tsx
+// app/users/page.tsx
 import { redirect } from 'next/navigation'
 import { createServerApi } from '@/lib/api-server'
 import { FetchError } from '@/lib/fetch'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
-export default async function PreordersPage() {
+export default async function UsersPage() {
   const api = createServerApi()
 
   try {
-    const { data } = await api.get<PreordersResponse, PreordersQueryParams>(
-      '/preorders',
+    const { data } = await api.get<TUsersResponse, TUserQueryOptions>(
+      '/users',
       {
         params: { page: 1 },
       }
@@ -1044,9 +1058,9 @@ export default async function PreordersPage() {
 
     return (
       <ul>
-        {data.items.map((p) => (
-          <li key={p.id}>
-            {p.sku} × {p.quantity}
+        {data.data.map((u) => (
+          <li key={u.id}>
+            {u.email} — {u.role}
           </li>
         ))}
       </ul>
@@ -1212,32 +1226,33 @@ export async function refreshAccessTokenServer(): Promise<void> {
 ```
 
 ```ts
-// features/preorders/server-api.ts
+// features/users/server-api.ts
 import { createServerApi } from '@/lib/api-server'
 import { refreshAccessTokenServer } from '@/features/auth/refresh-server'
 import { FetchError } from '@/lib/fetch'
+import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
-export async function getPreordersServer(params: PreordersQueryParams) {
+export async function getUsersServer(params: TUserQueryOptions) {
   try {
-    return await createServerApi().get<PreordersResponse, PreordersQueryParams>(
-      '/preorders',
+    return await createServerApi().get<TUsersResponse, TUserQueryOptions>(
+      '/users',
       { params }
     )
   } catch (error) {
     if (error instanceof FetchError && error.status === 401) {
       await refreshAccessTokenServer()
       // re-read cookies() now that refreshAccessTokenServer() has updated them
-      return await createServerApi().get<
-        PreordersResponse,
-        PreordersQueryParams
-      >('/preorders', { params })
+      return await createServerApi().get<TUsersResponse, TUserQueryOptions>(
+        '/users',
+        { params }
+      )
     }
     throw error
   }
 }
 ```
 
-This has to be called from something that can write cookies (a Server Action, or a Route Handler), since `refreshAccessTokenServer()` calls `cookies().set(...)` internally — calling `getPreordersServer` directly from a Server Component's render will throw when the refresh path is hit. Wrap Server Component data-fetching in a Route Handler or Server Action if a 401 refresh needs to happen during that page's render, or catch the 401 in the Server Component and `redirect('/login')` instead of attempting a refresh there.
+This has to be called from something that can write cookies (a Server Action, or a Route Handler), since `refreshAccessTokenServer()` calls `cookies().set(...)` internally — calling `getUsersServer` directly from a Server Component's render will throw when the refresh path is hit. Wrap Server Component data-fetching in a Route Handler or Server Action if a 401 refresh needs to happen during that page's render, or catch the 401 in the Server Component and `redirect('/login')` instead of attempting a refresh there.
 
 #### 5. Logout via a Server Action
 
@@ -1283,105 +1298,147 @@ and cookies need `SameSite=None; Secure` instead of `Lax`/`Strict` for cross-sit
 
 ## Full Real-World Example
 
-A complete, end-to-end setup using a **Bearer-token** client (see the [Authentication with httpOnly Cookies](#authentication-with-httponly-cookies-access--refresh-tokens) section above for the cookie-based alternative):
+A complete, end-to-end setup showing the **actual pattern used in this project** — HttpOnly cookie-based auth via `src/lib/$fetch.ts` + server actions:
 
 ```ts
-// lib/api.ts
-import { createFetch, FetchError } from '@/lib/fetch'
-import { getAuthToken } from '@/lib/auth'
+// src/lib/$fetch.ts — the pre-configured server-side instance
+import { cookies } from 'next/headers'
+import { createFetch } from '@/lib/fetch'
 
-export const api = createFetch({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL,
-  headers: { Accept: 'application/json' },
-  next: { revalidate: 60 },
-  onRequest: (req) => {
-    const token = getAuthToken()
-    if (token) {
+export const $fetch = createFetch({
+  baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`,
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+
+  onRequest: async (req) => {
+    // Forward the client's HttpOnly cookies to the downstream backend
+    const cookieStore = await cookies()
+    const cookieString = cookieStore.toString()
+    if (cookieString) {
       const headers = new Headers(req.init.headers)
-      headers.set('Authorization', `Bearer ${token}`)
+      headers.set('Cookie', cookieString)
       req.init.headers = headers
     }
     return req
   },
-  onError: (error) => {
-    if (error instanceof FetchError && error.status === 401) {
-      // e.g. redirect to login, clear session, etc.
+
+  onResponse: async (res) => {
+    // Forward any Set-Cookie headers back to the browser (e.g. token rotation)
+    const setCookieHeaders = res.headers.getSetCookie?.() ?? []
+    if (setCookieHeaders.length > 0) {
+      const cookieStore = await cookies()
+      for (const raw of setCookieHeaders) {
+        // ... parse and set (see src/lib/$fetch.ts for full implementation)
+        ;(void raw, cookieStore)
+      }
     }
-    throw error
+    return res
   },
 })
 ```
 
 ```ts
-// features/preorders/api.ts
-import { api } from '@/lib/api'
+// src/app/actions/auth.ts — Server Actions using $fetch
+'use server'
 
-export interface Preorder {
-  id: string
-  sku: string
-  quantity: number
+import { $fetch } from '@/lib/$fetch'
+import type { TLoginInput } from '@/types/auth.types'
+import type { TUserResponse } from '@/types/user.types'
+
+export const loginUser = async (data: TLoginInput) => {
+  const { data: response } = await $fetch.post<TUserResponse, TLoginInput>(
+    '/auth/login',
+    { body: data }
+  )
+  return response
+}
+```
+
+```ts
+// src/app/actions/user.ts — Server Actions using $fetch
+'use server'
+
+import { $fetch } from '@/lib/$fetch'
+import type {
+  TUsersResponse,
+  TUserResponse,
+  TUserQueryOptions,
+} from '@/types/user.types'
+
+export const getAllUsers = async (params: TUserQueryOptions) => {
+  const { data: response } = await $fetch.get<
+    TUsersResponse,
+    TUserQueryOptions
+  >('/users', { params })
+  return response
 }
 
-export interface PreordersResponse {
-  items: Preorder[]
-  total: number
-}
-
-// `type`, not `interface` — see the params note in "Two Ways to Use It" above
-export type PreordersQueryParams = {
-  page: number
-  limit?: number
-}
-
-export interface PreorderInput {
-  sku: string
-  quantity: number
-}
-
-export function getPreorders(params: PreordersQueryParams) {
-  return api.get<PreordersResponse, PreordersQueryParams>('/preorders', {
-    params,
-  })
-}
-
-export function createPreorder(body: PreorderInput) {
-  return api.post<Preorder, PreorderInput>('/preorders', { body })
-}
-
-export function updatePreorder(id: string, body: Partial<PreorderInput>) {
-  return api.patch<Preorder, Partial<PreorderInput>>(`/preorders/${id}`, {
-    body,
-  })
-}
-
-export function deletePreorder(id: string) {
-  return api.delete<{ success: boolean }>(`/preorders/${id}`)
+export const getMyProfile = async () => {
+  const { data: response } = await $fetch.get<TUserResponse>('/users/me')
+  return response
 }
 ```
 
 ```tsx
-// app/preorders/page.tsx
-import { getPreorders } from '@/features/preorders/api'
+// src/app/(dashboard)/users/page.tsx — Server Component consuming the actions
+import { getAllUsers } from '@/app/actions/user'
 import { FetchError } from '@/lib/fetch'
+import { redirect } from 'next/navigation'
 
-export default async function PreordersPage() {
+export default async function UsersPage() {
   try {
-    const { data } = await getPreorders({ page: 1, limit: 20 })
+    const users = await getAllUsers({ page: 1, limit: 20 })
     return (
       <ul>
-        {data.items.map((p) => (
-          <li key={p.id}>
-            {p.sku} × {p.quantity}
+        {users.data.map((u) => (
+          <li key={u.id}>
+            {u.email} — {u.role}
           </li>
         ))}
       </ul>
     )
   } catch (error) {
-    if (error instanceof FetchError) {
-      return <p>Failed to load preorders: {error.message}</p>
+    if (error instanceof FetchError && error.status === 401) {
+      redirect('/login')
     }
     throw error
   }
+}
+```
+
+```tsx
+// src/components/modules/auth/login-form.tsx — Client Component using useFetch + Server Action
+'use client'
+
+import { useFetch } from '@/lib/fetch'
+import { loginUser } from '@/app/actions/auth'
+import type { TLoginInput } from '@/types/auth.types'
+
+export function LoginForm() {
+  const { execute, isLoading, isError, error } = useFetch({
+    action: (data: TLoginInput) => loginUser(data),
+    onSuccess: () => {
+      window.location.assign('/dashboard')
+    },
+  })
+
+  const onSubmit = (data: TLoginInput) => {
+    void execute(data).catch(() => {})
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault() /* ... call onSubmit */
+      }}
+    >
+      {/* form fields */}
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Signing in…' : 'Sign in'}
+      </button>
+      {isError && <p>{error?.message}</p>}
+    </form>
+  )
 }
 ```
 

@@ -4,7 +4,7 @@ import {
 } from '@/validation/auth.validation'
 import z from 'zod/v3'
 
-type TLoginForm = z.infer<typeof loginFormSchema>
+type TLoginInput = z.infer<typeof loginFormSchema>
 
 type TRegisterForm = z.infer<typeof registerFormSchema>
 
@@ -28,7 +28,7 @@ type TResetPasswordInput = {
 
 export type {
   TForgotPasswordInput,
-  TLoginForm,
+  TLoginInput,
   TRegisterForm,
   TResendVerificationCodeInput,
   TResetPasswordInput,

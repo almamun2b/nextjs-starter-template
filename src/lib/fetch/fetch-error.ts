@@ -13,11 +13,15 @@ import type { FetchResponse } from './types'
  *
  * @example
  * ```ts
+ * import { $fetch, FetchError } from '@/lib/fetch'
+ * import type { TUserResponse } from '@/types/user.types'
+ *
  * try {
- *   await $fetch('/api/orders/999')
+ *   await $fetch.get<TUserResponse>(`/users/${id}`)
  * } catch (error) {
  *   if (error instanceof FetchError) {
- *     console.log(error.status, error.data)
+ *     console.log(error.status)   // e.g. 404
+ *     console.log(error.data)     // parsed body, e.g. { message: 'User not found' }
  *   }
  * }
  * ```

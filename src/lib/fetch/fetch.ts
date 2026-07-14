@@ -185,25 +185,32 @@ async function baseFetch<
  * their options: `$fetch.get`, `$fetch.post`, `$fetch.put`, `$fetch.patch`,
  * `$fetch.delete`, `$fetch.head`.
  *
- * @example Basic call
+ * @example Basic POST — login
  * ```ts
- * const { data, status, ok } = await $fetch<LoginResponse, LoginBody>('/auth/login', {
- *   baseUrl: process.env.NEXT_PUBLIC_API_URL,
+ * import type { TLoginInput } from '@/types/auth.types'
+ * import type { TUserResponse } from '@/types/user.types'
+ *
+ * const { data, status, ok } = await $fetch<TUserResponse, TLoginInput>('/auth/login', {
+ *   baseUrl: process.env.NEXT_PUBLIC_SITE_URL,
  *   method: 'POST',
  *   body: { email, password },
  * })
  * ```
  *
- * @example Method shorthands
+ * @example Method shorthands — GET list with params, POST create
  * ```ts
- * const { data } = await $fetch.get<PreordersResponse, TPreordersQueryParams>('/preorders', {
- *   baseUrl: process.env.NEXT_PUBLIC_API_URL,
- *   params: { page: 1 },
+ * import type { TUsersResponse, TUserQueryOptions, TCreateUserInput, TUserResponse } from '@/types/user.types'
+ *
+ * // GET with query params
+ * const { data: users } = await $fetch.get<TUsersResponse, TUserQueryOptions>('/users', {
+ *   baseUrl: process.env.NEXT_PUBLIC_SITE_URL,
+ *   params: { page: 1, limit: 20, role: 'USER' },
  * })
  *
- * const { data: created } = await $fetch.post<PreorderDetailResponse, TPreorderInput>('/preorders', {
- *   baseUrl: process.env.NEXT_PUBLIC_API_URL,
- *   body: { sku: 'ABC-1', quantity: 2 },
+ * // POST create
+ * const { data: created } = await $fetch.post<TUserResponse, TCreateUserInput>('/users', {
+ *   baseUrl: process.env.NEXT_PUBLIC_SITE_URL,
+ *   body: { email: 'alice@example.com', password: 'SecurePass1!' },
  * })
  * ```
  */

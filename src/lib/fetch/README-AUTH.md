@@ -42,16 +42,56 @@ export const serverApi = createFetch({
     return req
   },
   onResponse: async (res) => {
-    // 3. Optional: Forward 'Set-Cookie' header back to the client if the backend rotates/refreshes cookies
-    const setCookie = res.headers.get('set-cookie')
-    if (setCookie) {
+    // 3. Forward any Set-Cookie headers from the backend back to the browser.
+    //    This handles transparent cookie rotation (e.g. refreshed access tokens).
+    //    Note: cookies().set() is only effective inside Server Actions / Route Handlers.
+    const setCookieHeaders = res.headers.getSetCookie?.() ?? []
+
+    if (setCookieHeaders.length > 0) {
       const cookieStore = await cookies()
-      // You can parse setCookie and set them in the next/headers cookie store so they are sent to the client browser.
-      // Note: Setting cookies is only allowed in Server Actions or Route Handlers, not in Server Components.
+      for (const raw of setCookieHeaders) {
+        const [pair, ...attrs] = raw.split(';').map((part) => part.trim())
+        const eqIndex = pair.indexOf('=')
+        const name = pair.slice(0, eqIndex)
+        const value = pair.slice(eqIndex + 1)
+
+        const options: Parameters<typeof cookieStore.set>[2] = {}
+        for (const attr of attrs) {
+          const [key, val] = attr.split('=')
+          switch (key.toLowerCase()) {
+            case 'httponly':
+              options.httpOnly = true
+              break
+            case 'secure':
+              options.secure = true
+              break
+            case 'samesite':
+              options.sameSite = val?.toLowerCase() as 'lax' | 'strict' | 'none'
+              break
+            case 'path':
+              options.path = val
+              break
+            case 'max-age':
+              options.maxAge = Number(val)
+              break
+          }
+        }
+
+        try {
+          cookieStore.set(name, value, options)
+        } catch {
+          // Silently ignore — cookies().set() throws when called inside a
+          // Server Component render (read-only context). It works fine in
+          // Server Actions and Route Handlers.
+        }
+      }
     }
+
     return res
   },
 })
 ```
+
+> **Note:** `cookies().set()` from `next/headers` throws when called inside a Server Component's render (read-only context). The `onResponse` cookie-write logic is silently ignored there — it only takes effect inside Server Actions and Route Handlers.
 
 ---

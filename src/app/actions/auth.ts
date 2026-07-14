@@ -4,7 +4,7 @@ import { CACHE_TAGS } from '@/constant/tags'
 import { $fetch } from '@/lib/$fetch'
 import {
   TForgotPasswordInput,
-  TLoginForm,
+  TLoginInput,
   TRegisterForm,
   TResendVerificationCodeInput,
   TResetPasswordInput,
@@ -13,10 +13,11 @@ import {
 import { IResponse } from '@/types/response.types'
 import { TUserResponse } from '@/types/user.types'
 import { revalidateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
 
-const loginUser = async (data: TLoginForm) => {
+const loginUser = async (data: TLoginInput) => {
   try {
-    const { data: response } = await $fetch.post<TUserResponse, TLoginForm>(
+    const { data: response } = await $fetch.post<TUserResponse, TLoginInput>(
       '/auth/login',
       { body: data }
     )
@@ -28,7 +29,7 @@ const loginUser = async (data: TLoginForm) => {
     console.error('Failed to login:', error)
     throw error
   } finally {
-    // redirect('/')
+    redirect('/')
   }
 }
 
@@ -44,7 +45,7 @@ const registerUser = async (data: TRegisterForm) => {
     console.error('Failed to register:', error)
     throw error
   } finally {
-    // redirect('/')
+    redirect('/')
   }
 }
 

@@ -19,13 +19,29 @@ import type {
  *
  * @example
  * ```ts
- * export const api = createFetch({
- *   baseUrl: process.env.NEXT_PUBLIC_API_URL,
- *   headers: { Accept: 'application/json' },
- *   next: { revalidate: 60 },
+ * // src/lib/$fetch.ts
+ * import { cookies } from 'next/headers'
+ * import { createFetch } from '@/lib/fetch'
+ *
+ * export const $fetch = createFetch({
+ *   baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`,
+ *   headers: { 'Content-Type': 'application/json' },
+ *   credentials: 'include',
+ *   onRequest: async (req) => {
+ *     const cookieStore = await cookies()
+ *     const cookieString = cookieStore.toString()
+ *     if (cookieString) {
+ *       const headers = new Headers(req.init.headers)
+ *       headers.set('Cookie', cookieString)
+ *       req.init.headers = headers
+ *     }
+ *     return req
+ *   },
  * })
  *
- * const { data } = await api.get<PreordersResponse>('/preorders')
+ * // Then in server actions:
+ * import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
+ * const { data } = await $fetch.get<TUsersResponse, TUserQueryOptions>('/users', { params: { page: 1 } })
  * ```
  */
 export function createFetch(defaults: CreateFetchConfig = {}) {

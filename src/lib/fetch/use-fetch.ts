@@ -65,13 +65,46 @@ export interface UseFetchResult<TData, TArgs extends unknown[]> {
  * @template TData The type of the data returned by the Server Action.
  * @template TArgs The argument types tuple of the Server Action.
  *
- * @example
+ * @example Manual trigger — wrapping a Server Action
  * ```tsx
- * const { data, isLoading, isError, execute } = useFetch({
- *   action: (page: number) => api.get<PreordersResponse>('/preorders', { params: { page } }).then(r => r.data),
- * })
+ * 'use client'
+ * import { useFetch } from '@/lib/fetch'
+ * import { loginUser } from '@/app/actions/auth'
+ * import type { TLoginInput } from '@/types/auth.types'
  *
- * <button onClick={() => execute(1)} disabled={isLoading}>Load</button>
+ * export function LoginButton({ data }: { data: TLoginInput }) {
+ *   const { execute, isLoading, error } = useFetch({
+ *     action: (input: TLoginInput) => loginUser(input),
+ *     onSuccess: () => { window.location.assign('/dashboard') },
+ *     onError: (err) => { console.error('Login failed:', err.message) },
+ *   })
+ *
+ *   return (
+ *     <button onClick={() => execute(data).catch(() => {})} disabled={isLoading}>
+ *       {isLoading ? 'Signing in…' : 'Sign in'}
+ *     </button>
+ *   )
+ * }
+ * ```
+ *
+ * @example Immediate on mount — wrapping a list action
+ * ```tsx
+ * 'use client'
+ * import { useFetch } from '@/lib/fetch'
+ * import { getAllUsers } from '@/app/actions/user'
+ * import type { TUserQueryOptions } from '@/types/user.types'
+ *
+ * export function UsersList() {
+ *   const { data, isLoading, isError, error } = useFetch({
+ *     action: (params: TUserQueryOptions) => getAllUsers(params),
+ *     immediate: true,
+ *     args: [{ page: 1, limit: 20 }],
+ *   })
+ *
+ *   if (isLoading) return <p>Loading…</p>
+ *   if (isError) return <p>Failed: {error?.message}</p>
+ *   return <ul>{data?.data.map((u) => <li key={u.id}>{u.email}</li>)}</ul>
+ * }
  * ```
  */
 export function useFetch<TData, TArgs extends unknown[]>(

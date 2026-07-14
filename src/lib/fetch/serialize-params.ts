@@ -1,4 +1,4 @@
-import type { Primitive, QueryParamValue, QueryParams } from './types'
+import type { Primitive, QueryParams } from './types'
 
 /**
  * Serializes a single {@link Primitive} value to its query-string
@@ -35,7 +35,7 @@ export function serializeParams(params?: QueryParams): URLSearchParams {
       continue
     }
 
-    const serialized = serializePrimitive(value as QueryParamValue as Primitive)
+    const serialized = serializePrimitive(value as Primitive)
     if (serialized !== null) searchParams.append(key, serialized)
   }
 

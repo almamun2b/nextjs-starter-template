@@ -1,6 +1,8 @@
 /**
- * Primitive value types accepted as a single query-parameter value.
- * `null`/`undefined` are omitted.
+ * Scalar value types accepted as a single query-parameter value or as a
+ * body field value. `null`/`undefined` entries are omitted from query strings.
+ * Use explicit string formatting for any domain-specific types (e.g. ISO-format
+ * a date before passing it as a param or body field).
  */
 export type Primitive = string | number | boolean | null | undefined
 
