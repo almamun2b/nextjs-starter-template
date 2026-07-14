@@ -7,7 +7,8 @@ import { FetchError } from './fetch/fetch-error'
 let refreshPromise: Promise<void> | null = null
 
 const $fetch = createFetch({
-  baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`,
+  // baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`, //While using rewrites
+  baseUrl: `${process.env.NEXT_PUBLIC_API_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
   credentials: 'include',
 
