@@ -39,7 +39,7 @@ import { $fetch, createFetch, FetchError } from '@/lib/fetch'
   - [Resetting state](#resetting-state)
   - [Using `useFetch` with the `api` client (not just Server Actions)](#using-usefetch-with-the-api-client-not-just-server-actions)
 - [Authentication with httpOnly Cookies (Access + Refresh Tokens)](#authentication-with-httponly-cookies-access--refresh-tokens)
-  - [Client Components (Browser) — cookies are automatic](#client-components-browser--cookies-are-automatic)
+  - [Handling HttpOnly Cookie Authentication](#handling-httponly-cookie-authentication)
   - [Server Components, Server Actions & Route Handlers (Node.js) — cookies are NOT automatic](#server-components-server-actions--route-handlers-nodejs--cookies-are-not-automatic)
   - [CORS note for cross-origin APIs](#cors-note-for-cross-origin-apis)
 - [Full Real-World Example](#full-real-world-example)
@@ -778,9 +778,174 @@ A common pattern: your backend issues an `accessToken` and `refreshToken` as **h
 | `Set-Cookie` response stored automatically? | **Yes, automatically** — the browser stores it                                      | **No.** You must manually read `response.headers.getSetCookie()` and write each cookie back with Next's `cookies().set(...)`.                                 |
 | Where can cookies be written?               | N/A (browser handles it)                                                            | Only inside a **Server Action** or **Route Handler** — a Server Component's render is read-only and will throw if you try to call `cookies().set(...)` there. |
 
-> **Next.js version note:** `cookies()` from `next/headers` returns an **async** cookie store in Next.js 15+ (this project uses **Next.js 16**), so all examples below use `await cookies()`. See [README-AUTH.md](./README-AUTH.md) for the full cookie-forwarding pattern.
+> **Next.js version note:** `cookies()` from `next/headers` returns an **async** cookie store in Next.js 15+ (this project uses **Next.js 16**), so all examples below use `await cookies()`. See Examples below for the full cookie-forwarding pattern.
 
-### Client Components (Browser) — cookies are automatic
+## Handling HttpOnly Cookie Authentication
+
+If your backend issues `accessToken` and `refreshToken` via **HttpOnly cookies**, you must handle this differently depending on whether the request is made from the **Client** (Browser) or the **Server** (Server Components / Server Actions).
+
+### 1. Client-Side (Browser) Requests
+
+On the client side, the browser automatically sends and receives cookies. You only need to set `credentials: 'include'` so that cross-origin requests include the cookies:
+
+```ts
+import { createFetch } from '@/lib/fetch'
+
+export const clientApi = createFetch({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL,
+  credentials: 'include', // Ensure browser cookies are sent and Set-Cookie is honored
+})
+```
+
+### 2. Server-Side (Next.js Server Components / Actions)
+
+When Next.js renders a Server Component or executes a Server Action, it runs on the Node.js server. The native `fetch` on the server **does not automatically forward** the client's browser cookies to your backend API.
+
+You must manually forward the incoming cookies using `next/headers`:
+
+```ts
+import { cookies } from 'next/headers'
+import { parseSetCookie } from 'set-cookie-parser'
+import { createFetch } from './fetch'
+import { FetchError } from './fetch/fetch-error'
+
+type SameSite = 'lax' | 'strict' | 'none' | undefined
+
+// Deduplication promise for concurrent 401 errors
+let refreshPromise: Promise<void> | null = null
+const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1` // `${process.env.NEXT_PUBLIC_SITE_URL}/server`, //While using rewrites
+const refreshUrl = `${baseUrl}/auth/refresh-token`
+
+const $fetch = createFetch({
+  baseUrl: baseUrl,
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+
+  onRequest: async (req) => {
+    // Forward the client's HttpOnly cookies to the downstream backend.
+    const cookieStore = await cookies()
+    const cookieString = cookieStore.toString()
+
+    if (cookieString) {
+      const headers = new Headers(req.init.headers)
+      headers.set('Cookie', cookieString)
+      req.init.headers = headers
+    }
+
+    return req
+  },
+
+  onResponse: async (res) => {
+    // Forward any Set-Cookie headers from the backend back to the browser.
+    const setCookieHeaders = res.headers.getSetCookie?.() ?? []
+
+    if (setCookieHeaders.length > 0) {
+      const parsedCookies = parseSetCookie(setCookieHeaders, {
+        decodeValues: true,
+      })
+      const cookieStore = await cookies()
+
+      for (const cookie of parsedCookies) {
+        const { name, value, ...rest } = cookie
+        const options: Parameters<typeof cookieStore.set>[2] = {
+          ...rest,
+          sameSite: rest.sameSite as SameSite,
+        }
+        try {
+          cookieStore.set(name, value, options)
+        } catch {
+          // Silently ignore — cookies().set() throws when called inside a
+          // Server Component render (read-only context). It works fine in
+          // Server Actions and Route Handlers.
+        }
+      }
+    }
+
+    return res
+  },
+
+  onError: async (error: unknown) => {
+    // Auto-refresh on 401 errors
+    if (error instanceof FetchError && error.status === 401) {
+      // Deduplicate refresh calls to prevent multiple concurrent refreshes
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          try {
+            // Call refresh endpoint directly using native fetch to avoid circular dependency
+            const cookieStore = await cookies()
+            const cookieString = cookieStore.toString()
+
+            const headers = new Headers({
+              'Content-Type': 'application/json',
+            })
+
+            if (cookieString) {
+              headers.set('Cookie', cookieString)
+            }
+
+            const response = await fetch(refreshUrl, {
+              method: 'POST',
+              headers,
+              credentials: 'include',
+            })
+
+            // Forward Set-Cookie headers from refresh response using robust parser
+            const setCookieHeaders = response.headers.getSetCookie?.() ?? []
+            if (setCookieHeaders.length > 0) {
+              const parsedCookies = parseSetCookie(setCookieHeaders, {
+                decodeValues: true,
+              })
+
+              for (const cookie of parsedCookies) {
+                const { name, value, ...rest } = cookie
+                const options: Parameters<typeof cookieStore.set>[2] = {
+                  ...rest,
+                  sameSite: rest.sameSite as SameSite,
+                }
+                try {
+                  cookieStore.set(name, value, options)
+                } catch {
+                  // Silently ignore
+                }
+              }
+            }
+
+            if (!response.ok) {
+              throw new Error(`Token refresh failed: ${response.status}`)
+            }
+
+            console.log('[fetch] Token refreshed successfully')
+          } catch (refreshError) {
+            console.error('[fetch] Token refresh failed:', refreshError)
+            throw refreshError
+          }
+        })().finally(() => {
+          refreshPromise = null
+        })
+      }
+
+      try {
+        await refreshPromise
+      } catch {
+        // Refresh failed - rethrow the original 401 error
+        throw error
+      }
+
+      // Refresh succeeded - rethrow the original 401 error so caller can retry
+      throw error
+    }
+
+    console.error('Fetch error:', error)
+    throw error
+  },
+})
+
+export { $fetch }
+```
+
+> **Note:** `cookies().set()` from `next/headers` throws when called inside a Server Component's render (read-only context). The `onResponse` cookie-write logic is silently ignored there — it only takes effect inside Server Actions and Route Handlers.
+
+---
 
 #### 1. Login — server sets the cookies
 

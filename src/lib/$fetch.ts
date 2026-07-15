@@ -1,14 +1,17 @@
 import { cookies } from 'next/headers'
-import setCookieParser from 'set-cookie-parser'
+import { parseSetCookie } from 'set-cookie-parser'
 import { createFetch } from './fetch'
 import { FetchError } from './fetch/fetch-error'
 
+type SameSite = 'lax' | 'strict' | 'none' | undefined
+
 // Deduplication promise for concurrent 401 errors
 let refreshPromise: Promise<void> | null = null
+const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1` // `${process.env.NEXT_PUBLIC_SITE_URL}/server`, //While using rewrites
+const refreshUrl = `${baseUrl}/auth/refresh-token`
 
 const $fetch = createFetch({
-  // baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`, //While using rewrites
-  baseUrl: `${process.env.NEXT_PUBLIC_API_URL}/api/v1`,
+  baseUrl: baseUrl,
   headers: { 'Content-Type': 'application/json' },
   credentials: 'include',
 
@@ -31,25 +34,19 @@ const $fetch = createFetch({
     const setCookieHeaders = res.headers.getSetCookie?.() ?? []
 
     if (setCookieHeaders.length > 0) {
-      const parsedCookies = setCookieParser.parse(setCookieHeaders, {
+      const parsedCookies = parseSetCookie(setCookieHeaders, {
         decodeValues: true,
       })
-
       const cookieStore = await cookies()
 
       for (const cookie of parsedCookies) {
+        const { name, value, ...rest } = cookie
         const options: Parameters<typeof cookieStore.set>[2] = {
-          httpOnly: cookie.httpOnly,
-          secure: cookie.secure,
-          sameSite: cookie.sameSite as 'lax' | 'strict' | 'none' | undefined,
-          path: cookie.path,
-          maxAge: cookie.maxAge,
-          expires: cookie.expires,
-          // domain, priority, etc. can be added if needed
+          ...rest,
+          sameSite: rest.sameSite as SameSite,
         }
-
         try {
-          cookieStore.set(cookie.name, cookie.value, options)
+          cookieStore.set(name, value, options)
         } catch {
           // Silently ignore — cookies().set() throws when called inside a
           // Server Component render (read-only context). It works fine in
@@ -69,15 +66,15 @@ const $fetch = createFetch({
         refreshPromise = (async () => {
           try {
             // Call refresh endpoint directly using native fetch to avoid circular dependency
-            const refreshUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/server/auth/refresh-token`
             const cookieStore = await cookies()
             const cookieString = cookieStore.toString()
 
-            const headers: HeadersInit = {
+            const headers = new Headers({
               'Content-Type': 'application/json',
-            }
+            })
+
             if (cookieString) {
-              headers['Cookie'] = cookieString
+              headers.set('Cookie', cookieString)
             }
 
             const response = await fetch(refreshUrl, {
@@ -89,26 +86,18 @@ const $fetch = createFetch({
             // Forward Set-Cookie headers from refresh response using robust parser
             const setCookieHeaders = response.headers.getSetCookie?.() ?? []
             if (setCookieHeaders.length > 0) {
-              const parsedCookies = setCookieParser.parse(setCookieHeaders, {
+              const parsedCookies = parseSetCookie(setCookieHeaders, {
                 decodeValues: true,
               })
 
               for (const cookie of parsedCookies) {
+                const { name, value, ...rest } = cookie
                 const options: Parameters<typeof cookieStore.set>[2] = {
-                  httpOnly: cookie.httpOnly,
-                  secure: cookie.secure,
-                  sameSite: cookie.sameSite as
-                    | 'lax'
-                    | 'strict'
-                    | 'none'
-                    | undefined,
-                  path: cookie.path,
-                  maxAge: cookie.maxAge,
-                  expires: cookie.expires,
+                  ...rest,
+                  sameSite: rest.sameSite as SameSite,
                 }
-
                 try {
-                  cookieStore.set(cookie.name, cookie.value, options)
+                  cookieStore.set(name, value, options)
                 } catch {
                   // Silently ignore
                 }
