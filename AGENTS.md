@@ -59,6 +59,15 @@ No test runner is installed — do not assume a test command exists.
 - Forms use `react-hook-form` + `zodResolver` (from `@hookform/resolvers`). Follow this pattern.
 - Reuse `FormController` from `src/components/shared/FormController.tsx` for form fields.
 
+## Implementation expectations for agents
+
+- Prefer named exports for components, hooks, and utilities instead of default-exporting everything.
+- For new features, place pages under the appropriate route-group folder in `src/app/` and keep feature-specific UI in `src/components/modules/`.
+- For mutations and server-side auth flows, use Server Actions in `src/app/actions/` and revalidate relevant tags from `src/constant/tags.ts`.
+- For client-side data fetching, prefer the shared `useFetch` hook from `src/lib/fetch/use-fetch.ts` over custom loading/error state.
+- If a change touches auth, cookies, or token refresh, preserve the existing HttpOnly cookie flow in `src/lib/$fetch.ts`; do not move token handling to `localStorage`.
+- Reuse existing validation schemas and shared types instead of introducing ad hoc types or duplicate logic.
+
 ## Styling and code style
 
 - Formatting: no semicolons, single quotes, trailing commas (Prettier-driven).
