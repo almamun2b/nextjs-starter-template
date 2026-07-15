@@ -26,7 +26,6 @@ const getAllUsers = async (params: TUserQueryOptions) => {
     })
     return response
   } catch (error) {
-    console.error('Failed to get all users:', error)
     throw error
   }
 }
@@ -39,7 +38,6 @@ const createUserManually = async (data: TCreateUserInput) => {
     >('/users', { body: data })
     return response
   } catch (error) {
-    console.error('Failed to create user manually:', error)
     throw error
   }
 }
@@ -49,7 +47,6 @@ const getMyProfile = async () => {
     const { data: response } = await $fetch.get<TUserResponse>('/users/me')
     return response
   } catch (error) {
-    console.error('Failed to get my profile:', error)
     throw error
   }
 }
@@ -62,7 +59,6 @@ const updateMyProfile = async (data: TUpdateProfileInput) => {
     >('/users/me', { body: data })
     return response
   } catch (error) {
-    console.error('Failed to update my profile:', error)
     throw error
   }
 }
@@ -87,7 +83,6 @@ const updateMyProfileWihAvatar = async (
     )
     return response
   } catch (error) {
-    console.error('Failed to update my profile with avatar:', error)
     throw error
   }
 }
@@ -102,7 +97,6 @@ const updateMyAvatarOnly = async (data: UpdateAvatarInput) => {
     )
     return response
   } catch (error) {
-    console.error('Failed to update my avatar:', error)
     throw error
   }
 }
@@ -113,7 +107,6 @@ const deleteMyAvatar = async () => {
       await $fetch.delete<TUserResponse>('/users/me/avatar')
     return response
   } catch (error) {
-    console.error('Failed to delete my avatar:', error)
     throw error
   }
 }
@@ -126,7 +119,6 @@ const changeMyPassword = async (data: TChangePasswordInput) => {
     )
     return response
   } catch (error) {
-    console.error('Failed to change my password:', error)
     throw error
   }
 }
@@ -139,7 +131,6 @@ const deactivateMyAccount = async () => {
     >('/users/me/deactivate')
     return response
   } catch (error) {
-    console.error('Failed to deactivate my account:', error)
     throw error
   }
 }
@@ -152,7 +143,6 @@ const reactivateMyAccount = async () => {
     >('/users/me/reactivate')
     return response
   } catch (error) {
-    console.error('Failed to reactivate my account:', error)
     throw error
   }
 }
@@ -162,7 +152,6 @@ const getUserById = async (id: string) => {
     const { data: response } = await $fetch.get<TUserResponse>(`/users/${id}`)
     return response
   } catch (error) {
-    console.error('Failed to get user by id:', error)
     throw error
   }
 }
@@ -175,7 +164,6 @@ const updateUserStatus = async (id: string, data: TUpdateStatusInput) => {
     >(`/users/${id}/status`, { body: data })
     return response
   } catch (error) {
-    console.error('Failed to update user status:', error)
     throw error
   }
 }
@@ -188,7 +176,6 @@ const updateUserRole = async (id: string, data: TUpdateRoleInput) => {
     >(`/users/${id}/role`, { body: data })
     return response
   } catch (error) {
-    console.error('Failed to update user role:', error)
     throw error
   }
 }
@@ -200,7 +187,6 @@ const deleteUserSoft = async (id: string) => {
     )
     return response
   } catch (error) {
-    console.error('Failed to delete user soft:', error)
     throw error
   }
 }
@@ -212,7 +198,6 @@ const deleteUserHard = async (id: string) => {
     )
     return response
   } catch (error) {
-    console.error('Failed to delete user hard:', error)
     throw error
   }
 }

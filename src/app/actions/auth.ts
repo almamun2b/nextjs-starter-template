@@ -26,7 +26,6 @@ const loginUser = async (data: TLoginInput) => {
 
     return response
   } catch (error) {
-    console.error('Failed to login:', error)
     throw error
   } finally {
     redirect('/')
@@ -42,7 +41,6 @@ const registerUser = async (data: TRegisterForm) => {
 
     return response
   } catch (error) {
-    console.error('Failed to register:', error)
     throw error
   } finally {
     redirect('/')
@@ -58,7 +56,6 @@ const resendVerificationCode = async (data: TResendVerificationCodeInput) => {
 
     return response
   } catch (error) {
-    console.error('Failed to resend verification code:', error)
     throw error
   }
 }
@@ -72,7 +69,6 @@ const verifyEmail = async (data: TVerifyEmailInput) => {
 
     return response
   } catch (error) {
-    console.error('Failed to verify email:', error)
     throw error
   }
 }
@@ -85,7 +81,6 @@ const refreshToken = async () => {
 
     return response
   } catch (error) {
-    console.error('Failed to refresh token:', error)
     throw error
   }
 }
@@ -96,7 +91,6 @@ const logoutUser = async () => {
 
     return response
   } catch (error) {
-    console.error('Failed to logout:', error)
     throw error
   }
 }
@@ -110,7 +104,6 @@ const forgotPassword = async (data: TForgotPasswordInput) => {
 
     return response
   } catch (error) {
-    console.error('Failed to forgot password:', error)
     throw error
   }
 }
@@ -124,7 +117,6 @@ const resendForgotPassword = async (data: TForgotPasswordInput) => {
 
     return response
   } catch (error) {
-    console.error('Failed to resend forgot password:', error)
     throw error
   }
 }
@@ -138,7 +130,6 @@ const resetPassword = async (data: TResetPasswordInput) => {
 
     return response
   } catch (error) {
-    console.error('Failed to reset password:', error)
     throw error
   }
 }

@@ -1,3 +1,4 @@
+import { IResponse } from '@/types/response.types'
 import { cookies } from 'next/headers'
 import { parseSetCookie } from 'set-cookie-parser'
 import { createFetch } from './fetch'
@@ -58,7 +59,7 @@ const $fetch = createFetch({
     return res
   },
 
-  onError: async (error: unknown) => {
+  onError: async (error) => {
     // Auto-refresh on 401 errors
     if (error instanceof FetchError && error.status === 401) {
       // Deduplicate refresh calls to prevent multiple concurrent refreshes
@@ -68,6 +69,14 @@ const $fetch = createFetch({
             // Call refresh endpoint directly using native fetch to avoid circular dependency
             const cookieStore = await cookies()
             const cookieString = cookieStore.toString()
+            const refreshTokenCookie = cookieStore.get('refreshToken')
+
+            if (!refreshTokenCookie?.value?.trim()) {
+              console.warn(
+                '[fetch]: Refresh skipped because refreshToken is missing or empty'
+              )
+              throw error
+            }
 
             const headers = new Headers({
               'Content-Type': 'application/json',
@@ -104,13 +113,23 @@ const $fetch = createFetch({
               }
             }
 
+            const refreshResult: IResponse = await response.json()
             if (!response.ok) {
-              throw new Error(`Token refresh failed: ${response.status}`)
+              throw new FetchError({
+                data: refreshResult,
+                response,
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok,
+                url: response.url,
+                headers: response.headers,
+                message: refreshResult.message,
+              })
             }
 
-            console.log('[fetch] Token refreshed successfully')
+            console.log(`[fetch]: ${refreshResult.message}`)
           } catch (refreshError) {
-            console.error('[fetch] Token refresh failed:', refreshError)
+            console.error(`[fetch]: ${(refreshError as FetchError).message}`)
             throw refreshError
           }
         })().finally(() => {
@@ -129,7 +148,6 @@ const $fetch = createFetch({
       throw error
     }
 
-    console.error('Fetch error:', error)
     throw error
   },
 })
