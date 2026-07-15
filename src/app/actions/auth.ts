@@ -23,12 +23,9 @@ const loginUser = async (data: TLoginInput) => {
     )
 
     revalidateTag(CACHE_TAGS.PROFILE, 'max')
-
     return response
   } catch (error) {
     throw error
-  } finally {
-    redirect('/')
   }
 }
 

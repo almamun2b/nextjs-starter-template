@@ -22,11 +22,17 @@ import { TLoginInput } from '@/types/auth.types'
 import { loginFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useTransition } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { toast } from 'sonner'
 
 type TLoginFormProps = React.ComponentProps<'div'>
 
 export function LoginForm({ ...props }: TLoginFormProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+
   const form = useForm<TLoginInput>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
@@ -36,13 +42,20 @@ export function LoginForm({ ...props }: TLoginFormProps) {
     mode: 'onChange',
   })
 
-  const onSubmit = async (data: TLoginInput) => {
-    try {
-      const response = await loginUser(data)
-      console.log('Login response:', response)
-    } catch (error) {
-      console.log('Login error:', error)
-    }
+  const onSubmit = (data: TLoginInput) => {
+    startTransition(async () => {
+      try {
+        const result = await loginUser(data)
+        if (result.success) {
+          toast.success(result.message)
+          router.replace('/')
+        }
+      } catch (error) {
+        console.log(error)
+      } finally {
+        form.reset()
+      }
+    })
   }
   return (
     <Card {...props}>
@@ -98,7 +111,7 @@ export function LoginForm({ ...props }: TLoginFormProps) {
                       Password <span className="text-destructive">*</span>
                     </FieldLabel>
                     <Link
-                      href="#"
+                      href="/forgot-password"
                       className="inline-block text-sm underline-offset-4 hover:underline"
                     >
                       Forgot your password?
@@ -120,8 +133,20 @@ export function LoginForm({ ...props }: TLoginFormProps) {
               )}
             />
             <Field>
-              <Button type="submit" className="h-9">
-                Login
+              <Button
+                type="submit"
+                className="h-9"
+                disabled={
+                  isPending ||
+                  form.formState.isLoading ||
+                  form.formState.isSubmitting
+                }
+              >
+                {isPending ||
+                form.formState.isLoading ||
+                form.formState.isSubmitting
+                  ? 'Logging in...'
+                  : 'Login'}
               </Button>
               <Button variant="outline" type="button" className="h-9">
                 Login with Google
