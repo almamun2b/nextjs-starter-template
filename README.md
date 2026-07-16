@@ -29,7 +29,7 @@ A modern, highly-optimized Next.js starter template packed with **React 19**, **
 ## 📋 Prerequisites
 
 - **Node.js**: 18.17.0 or higher
-- **npm**: 9.0.0 or higher (or yarn/pnpm/bun)
+- **pnpm**: 8.0.0 or higher (or npm/yarn/bun)
 
 ## 🛠️ Installation
 
@@ -43,12 +43,16 @@ cd nextjs-starter-template
 ### Install dependencies
 
 ```bash
-npm install
-# or
-yarn install
-# or
+# Using pnpm (recommended)
 pnpm install
-# or
+
+# Or use npm
+npm install
+
+# Or use yarn
+yarn install
+
+# Or use bun
 bun install
 ```
 
@@ -57,12 +61,16 @@ bun install
 ### Start the development server
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Using pnpm (recommended)
 pnpm dev
-# or
+
+# Or use npm
+npm run dev
+
+# Or use yarn
+yarn dev
+
+# Or use bun
 bun dev
 ```
 
@@ -73,22 +81,24 @@ The page auto-updates as you edit files.
 ### Build for production
 
 ```bash
-npm run build
-npm run start
+pnpm build
+pnpm start
 ```
 
 ## 📚 Available Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run lint:fix` | Run ESLint with auto-fix |
-| `npm run format` | Format code with Prettier |
-| `npm run typecheck` | Check TypeScript types |
-| `npm run prepare` | Setup Husky hooks |
+| `pnpm dev` | Start development server |
+| `pnpm build` | Build for production |
+| `pnpm start` | Start production server |
+| `pnpm lint` | Run ESLint |
+| `pnpm lint:fix` | Run ESLint with auto-fix |
+| `pnpm format` | Format code with Prettier |
+| `pnpm typecheck` | Check TypeScript types |
+| `pnpm prepare` | Setup Husky hooks |
+
+> **Note:** Replace `pnpm` with `npm run`, `yarn`, or `bun` if you prefer a different package manager.
 
 ## 📦 Tech Stack
 
@@ -144,6 +154,7 @@ nextjs-starter-template/
 │   └── ...
 ├── public/               # Static assets
 ├── package.json          # Project dependencies
+├── pnpm-lock.yaml        # pnpm lock file
 ├── tsconfig.json         # TypeScript configuration
 ├── tailwind.config.ts    # Tailwind CSS configuration
 ├── eslint.config.js      # ESLint configuration
@@ -215,6 +226,13 @@ export default {
 Add components using the CLI:
 
 ```bash
+pnpm exec shadcn-ui@latest add button
+pnpm exec shadcn-ui@latest add input
+```
+
+Or with npm:
+
+```bash
 npx shadcn-ui@latest add button
 npx shadcn-ui@latest add input
 ```
@@ -244,20 +262,20 @@ export default function RootLayout({ children }) {
 ### ESLint
 
 ```bash
-npm run lint        # Check for issues
-npm run lint:fix    # Auto-fix issues
+pnpm lint        # Check for issues
+pnpm lint:fix    # Auto-fix issues
 ```
 
 ### Prettier
 
 ```bash
-npm run format      # Format all TypeScript files
+pnpm format      # Format all TypeScript files
 ```
 
 ### Type Checking
 
 ```bash
-npm run typecheck   # Verify TypeScript types
+pnpm typecheck   # Verify TypeScript types
 ```
 
 ### Husky & lint-staged
@@ -279,6 +297,8 @@ The easiest way to deploy is using [Vercel Platform](https://vercel.com):
 4. Vercel auto-detects Next.js and configures the build settings
 5. Click Deploy
 
+**Vercel automatically detects pnpm** and uses it if `pnpm-lock.yaml` is present.
+
 ### Docker
 
 Create a `Dockerfile`:
@@ -288,15 +308,18 @@ FROM node:20-alpine AS base
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+RUN corepack enable pnpm
+COPY pnpm-lock.yaml ./
+RUN pnpm fetch
 
 FROM base AS builder
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+RUN corepack enable pnpm
+COPY pnpm-lock.yaml ./
+RUN pnpm fetch
 COPY . .
-RUN npm run build
+RUN pnpm install --frozen-lockfile
+RUN pnpm build
 
 FROM base AS runner
 WORKDIR /app
@@ -327,6 +350,7 @@ CMD ["node", "server.js"]
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 - [shadcn/ui Documentation](https://ui.shadcn.com)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [pnpm Documentation](https://pnpm.io/)
 
 ## 🐛 Troubleshooting
 
@@ -345,20 +369,20 @@ taskkill /PID <PID> /F
 Or use a different port:
 
 ```bash
-npm run dev -- -p 3001
+pnpm dev -- -p 3001
 ```
 
 ### Node modules issues
 
 ```bash
-rm -rf node_modules package-lock.json
-npm install
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
 ```
 
 ### TypeScript errors
 
 ```bash
-npm run typecheck
+pnpm typecheck
 ```
 
 ## 📝 License
@@ -397,6 +421,7 @@ This template is built with awesome open-source projects:
 - [React](https://react.dev)
 - [Tailwind CSS](https://tailwindcss.com)
 - [shadcn/ui](https://ui.shadcn.com)
+- [pnpm](https://pnpm.io/)
 - And many more...
 
 ---
