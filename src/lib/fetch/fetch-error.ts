@@ -53,7 +53,7 @@ export class FetchError<TResponse = unknown> extends Error {
     this.statusText = result.statusText
     this.ok = result.ok
     this.url = result.url
-    this.data = (result.data ?? null) as TResponse | null
+    this.data = result.data ?? null
 
     if (options?.cause) {
       this.cause = options.cause

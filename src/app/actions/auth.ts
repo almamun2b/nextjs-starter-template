@@ -2,6 +2,7 @@
 
 import { CACHE_TAGS } from '@/constant/tags'
 import { $fetch } from '@/lib/$fetch'
+import { handleFetchError } from '@/lib/error'
 import {
   TForgotPasswordInput,
   TLoginInput,
@@ -10,12 +11,14 @@ import {
   TResetPasswordInput,
   TVerifyEmailInput,
 } from '@/types/auth.types'
-import { IResponse } from '@/types/response.types'
+import { IErrorResponse, IResponse } from '@/types/response.types'
 import { TUserResponse } from '@/types/user.types'
 import { revalidateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-const loginUser = async (data: TLoginInput) => {
+const loginUser = async (
+  data: TLoginInput
+): Promise<TUserResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<TUserResponse, TLoginInput>(
       '/auth/login',
@@ -24,8 +27,8 @@ const loginUser = async (data: TLoginInput) => {
 
     revalidateTag(CACHE_TAGS.PROFILE, 'max')
     return response
-  } catch (error) {
-    throw error
+  } catch (err) {
+    return handleFetchError(err)
   }
 }
 

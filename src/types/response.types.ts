@@ -19,7 +19,7 @@ interface IMetaCursor {
 
 interface IErrors {
   field: string | null
-  message: string
+  message: string | null
 }
 
 interface IResponse {
@@ -28,7 +28,18 @@ interface IResponse {
   message: string
   timestamp: string
   path: string
-  errors?: IErrors[] | null
 }
 
-export type { CursorSortDirection, IMeta, IMetaCursor, IResponse, SortOrder }
+interface IErrorResponse extends IResponse {
+  errors: IErrors[] | null
+  code: string
+}
+
+export type {
+  CursorSortDirection,
+  IErrorResponse,
+  IMeta,
+  IMetaCursor,
+  IResponse,
+  SortOrder,
+}

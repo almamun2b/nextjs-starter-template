@@ -18,6 +18,7 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { isFormInputField } from '@/lib/form'
 import { TLoginInput } from '@/types/auth.types'
 import { loginFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -44,16 +45,23 @@ export function LoginForm({ ...props }: TLoginFormProps) {
 
   const onSubmit = (data: TLoginInput) => {
     startTransition(async () => {
-      try {
-        const result = await loginUser(data)
-        if (result.success) {
-          toast.success(result.message)
-          router.replace('/')
-        }
-      } catch (error) {
-        console.log(error)
-      } finally {
+      const result = await loginUser(data)
+
+      if (result.success) {
+        toast.success(result.message)
         form.reset()
+        router.replace('/')
+        return
+      }
+
+      if ('errors' in result && result.errors && result.errors.length) {
+        for (const { field, message } of result.errors) {
+          if (field && isFormInputField(field, form.getValues())) {
+            form.setError(field, { message: message ?? 'Unknown Error' })
+          }
+        }
+      } else {
+        toast.error(result.message)
       }
     })
   }
@@ -139,7 +147,8 @@ export function LoginForm({ ...props }: TLoginFormProps) {
                 disabled={
                   isPending ||
                   form.formState.isLoading ||
-                  form.formState.isSubmitting
+                  form.formState.isSubmitting ||
+                  !form.formState.isValid
                 }
               >
                 {isPending ||
