@@ -61,7 +61,6 @@ export interface FetchResponse<TResponse = unknown> {
   statusText: string
   ok: boolean
   url: string
-  headers: Headers
   /** Convenience extraction of `data.message` when the parsed body is an object with a `message` string field, otherwise `null`. */
   message: string | null
 }

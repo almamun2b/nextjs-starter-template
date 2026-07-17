@@ -153,7 +153,6 @@ async function baseFetch<
     statusText: rawResponse.statusText,
     ok: rawResponse.ok,
     url: rawResponse.url || requestContext.url,
-    headers: rawResponse.headers,
     message: extractMessage(data),
   }
 

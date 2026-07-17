@@ -3,7 +3,7 @@ import type { FetchResponse } from './types'
 /**
  * Error thrown by `$fetch` whenever the underlying HTTP response resolves
  * with `ok === false`. Carries the full parsed {@link FetchResponse} shape
- * (status, headers, parsed `data`, ...) as direct properties so callers can
+ * (status, parsed `data`, ...) as direct properties so callers can
  * inspect the failure without re-parsing the response.
  *
  * Network-level failures (DNS errors, aborts, etc.) are *not* wrapped in a
@@ -33,7 +33,6 @@ export class FetchError<TResponse = unknown> extends Error {
   statusText: string
   ok: boolean
   url: string
-  headers: Headers
   /** Parsed response body, or `null` if it couldn't be determined. */
   data: TResponse | null
 
@@ -54,7 +53,6 @@ export class FetchError<TResponse = unknown> extends Error {
     this.statusText = result.statusText
     this.ok = result.ok
     this.url = result.url
-    this.headers = result.headers
     this.data = (result.data ?? null) as TResponse | null
 
     if (options?.cause) {

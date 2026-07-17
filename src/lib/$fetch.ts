@@ -122,7 +122,6 @@ const $fetch = createFetch({
                 statusText: response.statusText,
                 ok: response.ok,
                 url: response.url,
-                headers: response.headers,
                 message: refreshResult.message,
               })
             }

@@ -241,7 +241,8 @@ await $fetch.patch<TUserResponse, TUpdateProfileInput>('/users/me', {
 await $fetch.delete<TUserResponse>('/users/abc123', { baseUrl })
 
 // HEAD
-const { headers } = await $fetch.head('/users/me', { baseUrl })
+const { response } = await $fetch.head('/users/me', { baseUrl })
+response.headers.get('Content-Length')
 ```
 
 The same shorthands work on a `createFetch()` instance — `baseUrl` and other defaults are inherited automatically:
@@ -346,7 +347,6 @@ interface FetchResponse<TResponse> {
   statusText: string
   ok: boolean
   url: string
-  headers: Headers
   message: string | null // data.message, if the body is an object with a string `message` field
 }
 ```
@@ -389,8 +389,8 @@ try {
     console.log(error.statusText) // "Not Found"
     console.log(error.data) // parsed body, e.g. { message: "Not Found" }
     console.log(error.message) // "Not Found" (Error.message, from data.message)
-    console.log(error.headers) // response Headers
     console.log(error.response) // raw Response
+    console.log(error.response.headers) // response Headers
   }
   throw error
 }
@@ -487,7 +487,6 @@ const { data } = await $fetch<TUsersResponse>('/users', {
         statusText: error.statusText,
         ok: false,
         url: error.url,
-        headers: error.headers,
         message: 'not found, using empty fallback',
       }
     }
@@ -738,7 +737,7 @@ useEffect(() => {
 
 ### Using `useFetch` with the `api` client (not just Server Actions)
 
-Since `action` is just `(...args) => Promise<TData>`, it composes naturally with the `$fetch`/`createFetch` client from this same package — just unwrap `.data` (or pass through the whole `FetchResponse` if you'd rather keep `status`/`headers` too):
+Since `action` is just `(...args) => Promise<TData>`, it composes naturally with the `$fetch`/`createFetch` client from this same package — just unwrap `.data` (or pass through the whole `FetchResponse` if you'd rather keep `status`/`response` too):
 
 ```tsx
 'use client'
@@ -1631,7 +1630,7 @@ Creates a preconfigured, callable instance with the same signature (and method s
 
 ### `FetchError<TResponse>`
 
-Extends `Error`. Properties: `response`, `status`, `statusText`, `ok`, `url`, `headers`, `data`, plus the standard `message` (and `cause`, when a network error is wrapped internally).
+Extends `Error`. Properties: `response`, `status`, `statusText`, `ok`, `url`, `data`, plus the standard `message` (and `cause`, when a network error is wrapped internally).
 
 ### `useFetch<TData, TArgs>(options)`
 
