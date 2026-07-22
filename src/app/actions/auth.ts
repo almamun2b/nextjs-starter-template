@@ -46,7 +46,9 @@ const registerUser = async (
   }
 }
 
-const resendVerificationCode = async (data: TResendVerificationCodeInput) => {
+const resendVerificationCode = async (
+  data: TResendVerificationCodeInput
+): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<
       IResponse,
@@ -54,12 +56,14 @@ const resendVerificationCode = async (data: TResendVerificationCodeInput) => {
     >('/auth/resend-verification-code', { body: data })
 
     return response
-  } catch (error) {
-    throw error
+  } catch (err) {
+    return handleFetchError(err)
   }
 }
 
-const verifyEmail = async (data: TVerifyEmailInput) => {
+const verifyEmail = async (
+  data: TVerifyEmailInput
+): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse, TVerifyEmailInput>(
       '/auth/verify-email',
@@ -67,8 +71,8 @@ const verifyEmail = async (data: TVerifyEmailInput) => {
     )
 
     return response
-  } catch (error) {
-    throw error
+  } catch (err) {
+    return handleFetchError(err)
   }
 }
 

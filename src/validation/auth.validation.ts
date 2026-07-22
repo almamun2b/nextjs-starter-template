@@ -60,4 +60,11 @@ const registerFormSchema = z
     path: ['confirmPassword'],
   })
 
-export { loginFormSchema, registerFormSchema }
+const verifyEmailSchema = z.object({
+  code: z
+    .string()
+    .length(6, { message: 'Verification code must be 6 digits' })
+    .regex(/^\d{6}$/, { message: 'Verification code must be numeric' }),
+})
+
+export { loginFormSchema, registerFormSchema, verifyEmailSchema }
