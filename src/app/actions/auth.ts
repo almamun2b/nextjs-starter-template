@@ -14,7 +14,6 @@ import {
 import { IErrorResponse, IResponse } from '@/types/response.types'
 import { TUserResponse } from '@/types/user.types'
 import { revalidateTag } from 'next/cache'
-import { redirect } from 'next/navigation'
 
 const loginUser = async (
   data: TLoginInput
@@ -32,7 +31,9 @@ const loginUser = async (
   }
 }
 
-const registerUser = async (data: TRegisterForm) => {
+const registerUser = async (
+  data: TRegisterForm
+): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse, TRegisterForm>(
       '/auth/register',
@@ -40,10 +41,8 @@ const registerUser = async (data: TRegisterForm) => {
     )
 
     return response
-  } catch (error) {
-    throw error
-  } finally {
-    redirect('/')
+  } catch (err) {
+    return handleFetchError(err)
   }
 }
 
