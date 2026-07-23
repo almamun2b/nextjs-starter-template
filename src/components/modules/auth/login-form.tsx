@@ -31,6 +31,30 @@ import { toast } from 'sonner'
 
 type TLoginFormProps = React.ComponentProps<'div'>
 
+interface DemoCredential {
+  type: string
+  email: string
+  password: string
+}
+
+const DEMO_CREDENTIALS: DemoCredential[] = [
+  {
+    type: 'Super Admin',
+    email: 'super@gmail.com',
+    password: 'Password1#',
+  },
+  {
+    type: 'Admin',
+    email: 'admin@gmail.com',
+    password: 'Password1#',
+  },
+  {
+    type: 'User',
+    email: 'user@gmail.com',
+    password: 'Password1#',
+  },
+]
+
 export function LoginForm({ ...props }: TLoginFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -66,6 +90,12 @@ export function LoginForm({ ...props }: TLoginFormProps) {
       }
     })
   }
+
+  const handleDemoCredentialClick = (credential: DemoCredential) => {
+    form.setValue('email', credential.email, { shouldValidate: true })
+    form.setValue('password', credential.password, { shouldValidate: true })
+  }
+
   return (
     <Card {...props}>
       <CardHeader>
@@ -166,6 +196,26 @@ export function LoginForm({ ...props }: TLoginFormProps) {
             </Field>
           </FieldGroup>
         </form>
+
+        {/* Demo Credentials Section */}
+        <div className="mt-8 border-t pt-6">
+          <p className="text-sm font-medium text-muted-foreground mb-4">
+            Demo Credentials for Testing
+          </p>
+          <div className="flex flex-col gap-2">
+            {DEMO_CREDENTIALS.map((credential) => (
+              <Button
+                key={credential.type}
+                type="button"
+                variant="outline"
+                className="justify-start h-9"
+                onClick={() => handleDemoCredentialClick(credential)}
+              >
+                {credential.type}
+              </Button>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
