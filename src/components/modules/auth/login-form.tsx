@@ -18,6 +18,7 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/modules/auth/password-input'
 import { isFormInputField } from '@/lib/form'
 import { TLoginInput } from '@/types/auth.types'
 import { loginFormSchema } from '@/validation/auth.validation'
@@ -125,10 +126,9 @@ export function LoginForm({ ...props }: TLoginFormProps) {
                       Forgot your password?
                     </Link>
                   </FieldContent>
-                  <Input
+                  <PasswordInput
                     {...field}
                     id={field.name}
-                    type="password"
                     aria-invalid={fieldState.invalid}
                     placeholder="********"
                     autoComplete="on"

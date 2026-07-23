@@ -1,10 +1,10 @@
-import { getMyProfile } from '@/app/actions/user'
+import { me } from '@/app/actions/user'
 import { LogoutButton } from '@/components/modules/auth/logout-button'
 
 const ProfilePage = async () => {
-  const result = await getMyProfile()
+  const result = await me()
 
-  if (result.success) {
+  if (result && result?.data) {
     return (
       <div className="space-y-4">
         <LogoutButton />

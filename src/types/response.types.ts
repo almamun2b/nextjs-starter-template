@@ -33,6 +33,7 @@ interface IResponse {
 interface IErrorResponse extends IResponse {
   errors: IErrors[] | null
   code: string
+  data?: null
 }
 
 export type {

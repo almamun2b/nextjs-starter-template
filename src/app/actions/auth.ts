@@ -26,8 +26,8 @@ const loginUser = async (
 
     revalidateTag(CACHE_TAGS.PROFILE, 'max')
     return response
-  } catch (err) {
-    return handleFetchError(err)
+  } catch (error) {
+    return handleFetchError(error)
   }
 }
 
@@ -41,8 +41,8 @@ const registerUser = async (
     )
 
     return response
-  } catch (err) {
-    return handleFetchError(err)
+  } catch (error) {
+    return handleFetchError(error)
   }
 }
 
@@ -56,8 +56,8 @@ const resendVerificationCode = async (
     >('/auth/resend-verification-code', { body: data })
 
     return response
-  } catch (err) {
-    return handleFetchError(err)
+  } catch (error) {
+    return handleFetchError(error)
   }
 }
 
@@ -71,12 +71,12 @@ const verifyEmail = async (
     )
 
     return response
-  } catch (err) {
-    return handleFetchError(err)
+  } catch (error) {
+    return handleFetchError(error)
   }
 }
 
-const refreshToken = async () => {
+const refreshToken = async (): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>(
       '/auth/refresh-token'
@@ -84,21 +84,23 @@ const refreshToken = async () => {
 
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const logoutUser = async () => {
+const logoutUser = async (): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>('/auth/logout')
 
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const forgotPassword = async (data: TForgotPasswordInput) => {
+const forgotPassword = async (
+  data: TForgotPasswordInput
+): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>(
       '/auth/forgot-password',
@@ -107,11 +109,13 @@ const forgotPassword = async (data: TForgotPasswordInput) => {
 
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const resendForgotPassword = async (data: TForgotPasswordInput) => {
+const resendForgotPassword = async (
+  data: TForgotPasswordInput
+): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>(
       '/auth/resend-forgot-password',
@@ -120,11 +124,13 @@ const resendForgotPassword = async (data: TForgotPasswordInput) => {
 
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const resetPassword = async (data: TResetPasswordInput) => {
+const resetPassword = async (
+  data: TResetPasswordInput
+): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>(
       '/auth/reset-password',
@@ -133,7 +139,7 @@ const resetPassword = async (data: TResetPasswordInput) => {
 
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 

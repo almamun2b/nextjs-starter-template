@@ -18,6 +18,7 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/modules/auth/password-input'
 import { isFormInputField } from '@/lib/form'
 import { TRegisterForm } from '@/types/auth.types'
 import { registerFormSchema } from '@/validation/auth.validation'
@@ -182,10 +183,9 @@ export function SignupForm({ ...props }: TSignupFormProps) {
                       number, and special character
                     </FieldDescription>
                   </FieldContent>
-                  <Input
+                  <PasswordInput
                     {...field}
                     id={field.name}
-                    type="password"
                     aria-invalid={fieldState.invalid}
                     placeholder="********"
                     autoComplete="on"
@@ -211,10 +211,9 @@ export function SignupForm({ ...props }: TSignupFormProps) {
                       <span className="text-destructive">*</span>
                     </FieldLabel>
                   </FieldContent>
-                  <Input
+                  <PasswordInput
                     {...field}
                     id={field.name}
-                    type="password"
                     aria-invalid={fieldState.invalid}
                     placeholder="********"
                     autoComplete="on"
