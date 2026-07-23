@@ -11,8 +11,8 @@ import {
   TResetPasswordInput,
   TVerifyEmailInput,
 } from '@/types/auth.types'
-import { IErrorResponse, IResponse } from '@/types/response.types'
-import { TUserResponse } from '@/types/user.types'
+import type { IErrorResponse, IResponse } from '@/types/response.types'
+import type { TUserResponse } from '@/types/user.types'
 import { revalidateTag } from 'next/cache'
 
 const loginUser = async (
