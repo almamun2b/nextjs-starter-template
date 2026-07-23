@@ -1,14 +1,38 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
-// This function can be marked `async` if using `await` inside
+const publicRoutes = new Set([
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+])
+
+const authRoutes = new Set(['/dashboard', '/profile', '/settings', '/users'])
+
 export function proxy(request: NextRequest) {
-  return NextResponse.redirect(new URL('/home', request.url))
+  const { pathname } = request.nextUrl
+  const refreshToken = request.cookies.get('refreshToken')?.value
+
+  const isAuthenticated = !!refreshToken
+
+  if (isAuthenticated && publicRoutes.has(pathname)) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (
+    !isAuthenticated &&
+    Array.from(authRoutes).some((route) => pathname.startsWith(route))
+  ) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  return NextResponse.next()
 }
 
-// Alternatively, you can use a default export:
-// export default function proxy(request: NextRequest) { ... }
-
 export const config = {
-  matcher: '/api/auth/:path*',
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+  ],
 }

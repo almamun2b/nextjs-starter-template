@@ -11,6 +11,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import type { IUser } from '@/types/user.types'
 import {
   GalleryVerticalEnd,
   Layout,
@@ -19,49 +20,47 @@ import {
   Users,
 } from 'lucide-react'
 
-const data = {
-  user: {
-    name: 'Mamun',
-    email: 'mamun@example.com',
-    avatar: null,
-  },
-  navMain: {
-    label: 'Dashboard',
-    items: [
-      {
-        title: 'Dashboard',
-        url: '/dashboard',
-        icon: Layout,
-        isActive: false,
-      },
-      {
-        title: 'Users',
-        url: '/users',
-        icon: Users,
-        isActive: false,
-      },
-    ],
-  },
-  navSecondary: {
-    label: 'Settings',
-    items: [
-      {
-        title: 'Settings',
-        url: '/settings',
-        icon: Settings,
-        isActive: false,
-      },
-      {
-        title: 'Profile',
-        url: '/profile',
-        icon: UserIcon,
-        isActive: false,
-      },
-    ],
-  },
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user: IUser | null
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+const navMain = {
+  label: 'Dashboard',
+  items: [
+    {
+      title: 'Dashboard',
+      url: '/dashboard',
+      icon: Layout,
+      isActive: false,
+    },
+    {
+      title: 'Users',
+      url: '/users',
+      icon: Users,
+      isActive: false,
+    },
+  ],
+}
+
+const navSecondary = {
+  label: 'Settings',
+  items: [
+    {
+      title: 'Settings',
+      url: '/settings',
+      icon: Settings,
+      isActive: false,
+    },
+    {
+      title: 'Profile',
+      url: '/profile',
+      icon: UserIcon,
+      isActive: false,
+    },
+  ],
+}
+
+export function AppSidebar({ user, ...props }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="flex h-16 flex-row border-b">
@@ -75,11 +74,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain group={data.navMain} />
-        <NavMain group={data.navSecondary} className="mt-auto" />
+        <NavMain group={navMain} />
+        <NavMain group={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
