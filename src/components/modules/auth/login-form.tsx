@@ -202,13 +202,13 @@ export function LoginForm({ ...props }: TLoginFormProps) {
           <p className="text-sm font-medium text-muted-foreground mb-4">
             Demo Credentials for Testing
           </p>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-row gap-2">
             {DEMO_CREDENTIALS.map((credential) => (
               <Button
                 key={credential.type}
                 type="button"
                 variant="outline"
-                className="justify-start h-9"
+                className="h-9 flex-1"
                 onClick={() => handleDemoCredentialClick(credential)}
               >
                 {credential.type}
