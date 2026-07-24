@@ -31,9 +31,9 @@ interface IResponse {
 }
 
 interface IErrorResponse extends IResponse {
+  success: false
   errors: IErrors[] | null
   code: string
-  data?: null
 }
 
 export type {

@@ -1,6 +1,7 @@
 'use client'
 
 import { loginUser } from '@/app/actions/auth'
+import { PasswordInput } from '@/components/modules/auth/password-input'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -18,7 +19,6 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { PasswordInput } from '@/components/modules/auth/password-input'
 import { isFormInputField } from '@/lib/form'
 import { TLoginInput } from '@/types/auth.types'
 import { loginFormSchema } from '@/validation/auth.validation'
