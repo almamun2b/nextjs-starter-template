@@ -14,7 +14,7 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }>) {
   const userResult = await me()
-  const user = userResult?.data ?? null
+  const user = userResult.success && userResult.data ? userResult.data : null
 
   return (
     <SidebarProvider>
