@@ -5,7 +5,10 @@ import { Button } from '../ui/button'
 
 const Header = async () => {
   const cookieStore = await cookies()
-  const isLoggedIn = !!cookieStore.get('refreshToken')?.value
+  const refreshToken = cookieStore.get('refreshToken')?.value
+  const accessToken = cookieStore.get('accessToken')?.value
+
+  const isLoggedIn = !!accessToken && !!refreshToken
   const navMenus = [{ label: 'Home', href: '/', icon: null }]
   return (
     <nav className="fixed z-50 h-14 w-full border bg-background dark:border-slate-700/70">

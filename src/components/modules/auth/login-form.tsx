@@ -199,7 +199,7 @@ export function LoginForm({ ...props }: TLoginFormProps) {
 
         {/* Demo Credentials Section */}
         <div className="mt-8 border-t pt-6">
-          <p className="text-sm font-medium text-muted-foreground mb-4">
+          <p className="mb-4 text-sm font-medium text-muted-foreground">
             Demo Credentials for Testing
           </p>
           <div className="flex flex-row gap-2">

@@ -14,8 +14,9 @@ const authRoutes = new Set(['/dashboard', '/profile', '/settings', '/users'])
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const refreshToken = request.cookies.get('refreshToken')?.value
+  const accessToken = request.cookies.get('accessToken')?.value
 
-  const isAuthenticated = !!refreshToken
+  const isAuthenticated = !!accessToken && !!refreshToken
 
   if (isAuthenticated && publicRoutes.has(pathname)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
