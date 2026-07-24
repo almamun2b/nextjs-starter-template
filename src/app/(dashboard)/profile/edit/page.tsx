@@ -1,13 +1,13 @@
 import { me } from '@/app/actions/user'
-import { ProfileView } from '@/components/modules/auth/profile-view'
+import { ProfileEditForm } from '@/components/modules/auth/profile-edit-form'
 
-const ProfilePage = async () => {
+const ProfileEditPage = async () => {
   const result = await me()
 
   if (result.success && result.data) {
     return (
       <div className="space-y-6">
-        <ProfileView user={result.data} />
+        <ProfileEditForm user={result.data} />
       </div>
     )
   }
@@ -19,4 +19,4 @@ const ProfilePage = async () => {
   )
 }
 
-export default ProfilePage
+export default ProfileEditPage

@@ -146,8 +146,8 @@ type TChangePasswordInput = {
   newPassword: string
 }
 
+export { Gender, UserRole, UserStatus }
 export type {
-  Gender,
   IAvatar,
   IUser,
   TChangePasswordInput,
@@ -161,6 +161,4 @@ export type {
   TUserResponse,
   TUsersResponse,
   UpdateAvatarInput,
-  UserRole,
-  UserStatus,
 }

@@ -60,4 +60,59 @@ const verifyEmailSchema = z.object({
     .regex(/^\d{6}$/, { message: 'Verification code must be numeric' }),
 })
 
-export { loginFormSchema, registerFormSchema, verifyEmailSchema }
+const genderEnum = z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'])
+
+const profileFormSchema = z.object({
+  firstName: z
+    .string()
+    .max(50, { message: 'First name must be under 50 characters' })
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  lastName: z
+    .string()
+    .max(50, { message: 'Last name must be under 50 characters' })
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  phone: z
+    .string()
+    .max(20, { message: 'Phone number must be under 20 characters' })
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  bio: z
+    .string()
+    .max(500, { message: 'Bio must be under 500 characters' })
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  gender: z.union([z.literal(''), genderEnum]).optional(),
+  address: z
+    .string()
+    .max(200, { message: 'Address must be under 200 characters' })
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  dateOfBirth: z.string().optional().or(z.literal('')),
+  timezone: z
+    .string()
+    .max(50, { message: 'Timezone must be under 50 characters' })
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  locale: z
+    .string()
+    .max(10, { message: 'Locale must be under 10 characters' })
+    .trim()
+    .optional()
+    .or(z.literal('')),
+})
+
+export {
+  genderEnum,
+  loginFormSchema,
+  profileFormSchema,
+  registerFormSchema,
+  verifyEmailSchema,
+}
