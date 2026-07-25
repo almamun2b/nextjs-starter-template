@@ -53,6 +53,23 @@ const registerFormSchema = z
     path: ['confirmPassword'],
   })
 
+const forgotPasswordSchema = z.object({
+  email: emailSchema,
+})
+
+const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, { message: 'Token is required' }),
+    newPassword: passwordSchema,
+    confirmPassword: z
+      .string()
+      .min(1, { message: 'Please confirm your password' }),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+
 const verifyEmailSchema = z.object({
   code: z
     .string()
@@ -110,9 +127,11 @@ const profileFormSchema = z.object({
 })
 
 export {
+  forgotPasswordSchema,
   genderEnum,
   loginFormSchema,
   profileFormSchema,
   registerFormSchema,
+  resetPasswordSchema,
   verifyEmailSchema,
 }
