@@ -1,4 +1,5 @@
 import { me } from '@/app/actions/user'
+import { DeactivateAccountButton } from '@/components/modules/user/deactivate-account-button'
 import { ProfileView } from '@/components/modules/auth/profile-view'
 
 const ProfilePage = async () => {
@@ -8,6 +9,7 @@ const ProfilePage = async () => {
     return (
       <div className="space-y-6">
         <ProfileView user={result.data} />
+        <DeactivateAccountButton />
       </div>
     )
   }

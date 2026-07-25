@@ -1,9 +1,11 @@
+import { changePasswordSchema } from '@/validation/user.validation'
 import {
   CursorSortDirection,
   IMeta,
   IResponse,
   SortOrder,
 } from './response.types'
+import z from 'zod/v3'
 
 enum UserRole {
   SUPER_ADMIN,
@@ -146,10 +148,13 @@ type TChangePasswordInput = {
   newPassword: string
 }
 
+type TChangePasswordForm = z.infer<typeof changePasswordSchema>
+
 export { Gender, UserRole, UserStatus }
 export type {
   IAvatar,
   IUser,
+  TChangePasswordForm,
   TChangePasswordInput,
   TCreateUserInput,
   TUpdateProfileInput,

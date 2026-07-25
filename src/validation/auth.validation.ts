@@ -130,6 +130,7 @@ export {
   forgotPasswordSchema,
   genderEnum,
   loginFormSchema,
+  passwordSchema,
   profileFormSchema,
   registerFormSchema,
   resetPasswordSchema,

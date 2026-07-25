@@ -14,6 +14,7 @@ import {
 import type { IUser } from '@/types/user.types'
 import {
   GalleryVerticalEnd,
+  KeyRound,
   Layout,
   Settings,
   UserIcon,
@@ -55,6 +56,12 @@ const navSecondary = {
       title: 'Profile',
       url: '/profile',
       icon: UserIcon,
+      isActive: false,
+    },
+    {
+      title: 'Change Password',
+      url: '/change-password',
+      icon: KeyRound,
       isActive: false,
     },
   ],
