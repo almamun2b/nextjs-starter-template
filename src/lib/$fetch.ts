@@ -8,7 +8,7 @@ type SameSite = 'lax' | 'strict' | 'none' | undefined
 
 // Deduplication promise for concurrent 401 errors
 let refreshPromise: Promise<void> | null = null
-const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1` // `${process.env.NEXT_PUBLIC_SITE_URL}/server`, //While using rewrites
+const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1` // `${process.env.NEXT_PUBLIC_SITE_URL}/server`, // # While using rewrites
 const refreshUrl = `${baseUrl}/auth/refresh-token`
 
 const $fetch = createFetch({

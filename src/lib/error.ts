@@ -6,7 +6,7 @@ const isFetchError = (err: unknown): err is FetchError<IErrorResponse> => {
 }
 
 const handleFetchError = (error: unknown): IErrorResponse => {
-  if (isFetchError(error) && error.data) {
+  if (isFetchError(error) && error.data && error.data.statusCode !== 401) {
     return error.data
   }
   throw error

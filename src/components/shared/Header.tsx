@@ -1,14 +1,10 @@
+import { getIsLoggedIn } from '@/lib/session'
 import { Home } from 'lucide-react'
-import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { Button } from '../ui/button'
 
 const Header = async () => {
-  const cookieStore = await cookies()
-  const refreshToken = cookieStore.get('refreshToken')?.value
-  const accessToken = cookieStore.get('accessToken')?.value
-
-  const isLoggedIn = !!accessToken && !!refreshToken
+  const isLoggedIn = await getIsLoggedIn()
   const navMenus = [{ label: 'Home', href: '/', icon: null }]
   return (
     <nav className="fixed z-50 h-14 w-full border bg-background dark:border-slate-700/70">
