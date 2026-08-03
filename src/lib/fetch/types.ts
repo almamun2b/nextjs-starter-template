@@ -90,15 +90,28 @@ export type OnSuccessHook<TResponse = unknown> = (
 ) => FetchResponse<TResponse> | Promise<FetchResponse<TResponse>>
 
 /**
+ * Re-runs the exact same request once (with fresh headers from `onRequest`,
+ * e.g. newly-refreshed cookies). Resolves with the parsed result on success,
+ * or `null` if the retry budget was exhausted or the retry also failed.
+ */
+export type RetryFn = () => Promise<FetchResponse<unknown> | null>
+
+/**
  * Called whenever a request fails — either a network-level failure (e.g.
  * DNS/abort, in which case `error` is the native thrown error/`TypeError`)
  * or an HTTP-level failure (`response.ok === false`, in which case `error`
  * is a {@link FetchError} carrying the parsed response).
  *
+ * The second argument, `retry`, re-runs the same request once with fresh
+ * `onRequest` headers — use it to implement "refresh the token then retry".
+ *
  * Return a value to have `$fetch` resolve with that value instead of
  * throwing (recovery), or return `undefined`/rethrow to propagate the error.
  */
-export type OnErrorHook = (error: unknown) => unknown | Promise<unknown>
+export type OnErrorHook = (
+  error: unknown,
+  retry: RetryFn
+) => unknown | Promise<unknown>
 
 /**
  * Lifecycle hooks shared by both a single `$fetch` call and an

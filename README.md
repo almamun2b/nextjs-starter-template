@@ -25,6 +25,7 @@ A modern, highly-optimized Next.js starter template packed with **React 19**, **
 - 🎨 **Lucide React** for icons
 - 🌙 **next-themes** for dark mode support
 - 🔄 **Production-ready fetch utility** with TypeScript support
+- 🔐 **HttpOnly-cookie auth** (access + refresh tokens) with silent token refresh
 
 ## 📋 Prerequisites
 
@@ -87,27 +88,29 @@ pnpm start
 
 ## 📚 Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server |
-| `pnpm build` | Build for production |
-| `pnpm start` | Start production server |
-| `pnpm lint` | Run ESLint |
-| `pnpm lint:fix` | Run ESLint with auto-fix |
-| `pnpm format` | Format code with Prettier |
-| `pnpm typecheck` | Check TypeScript types |
-| `pnpm prepare` | Setup Husky hooks |
+| Command          | Description               |
+| ---------------- | ------------------------- |
+| `pnpm dev`       | Start development server  |
+| `pnpm build`     | Build for production      |
+| `pnpm start`     | Start production server   |
+| `pnpm lint`      | Run ESLint                |
+| `pnpm lint:fix`  | Run ESLint with auto-fix  |
+| `pnpm format`    | Format code with Prettier |
+| `pnpm typecheck` | Check TypeScript types    |
+| `pnpm prepare`   | Setup Husky hooks         |
 
 > **Note:** Replace `pnpm` with `npm run`, `yarn`, or `bun` if you prefer a different package manager.
 
 ## 📦 Tech Stack
 
 ### Core Framework
+
 - **Next.js** (16.2.9) - React framework for production
 - **React** (19.2.4) - UI library
 - **React DOM** (19.2.4) - React rendering for web
 
 ### Styling & UI
+
 - **Tailwind CSS** (4) - Utility-first CSS framework
 - **Tailwind CSS PostCSS** (4) - PostCSS plugin for Tailwind
 - **shadcn/ui** (4.11.0) - High-quality React components
@@ -115,11 +118,13 @@ pnpm start
 - **next-themes** (0.4.6) - Theme management (dark mode)
 
 ### Forms & Validation
+
 - **React Hook Form** (7.80.0) - Performant form management
 - **@hookform/resolvers** (5.4.0) - Schema validation resolvers
 - **Zod** (4.4.3) - TypeScript-first schema validation
 
 ### Utilities
+
 - **date-fns** (4.4.0) - Modern date utility library
 - **clsx** (2.1.1) - Utility for constructing className strings
 - **tailwind-merge** (3.6.0) - Merge Tailwind classes
@@ -130,6 +135,7 @@ pnpm start
 - **radix-ui** (1.6.0) - Headless UI primitives
 
 ### Development Tools
+
 - **TypeScript** (5) - Type-safe JavaScript
 - **ESLint** (9) - JavaScript linter
 - **Prettier** (3.8.3) - Code formatter
@@ -198,6 +204,29 @@ const { data } = await api.get<TUserResponse>('/users')
 ```
 
 For detailed documentation, see [`lib/fetch/README.md`](./lib/fetch/README.md).
+
+## 🔐 Authentication (HttpOnly Cookie Flow)
+
+Auth is handled with a custom JWT + **HttpOnly cookie** flow (no Auth.js/Clerk) against the companion Express backend (`express-postgrsql-starter`):
+
+- On login the backend issues `accessToken` + `refreshToken` as **HttpOnly** cookies — client JS never sees or stores them.
+- The backend authenticates via `Cookie: accessToken=...` — **not** `Authorization: Bearer`.
+- All server-side calls go through `$fetch` (`src/lib/$fetch.ts`), which forwards the request's cookies to the backend and relays backend `Set-Cookie` responses back to the browser.
+
+Token refresh happens in **two layers** so it works in every cookie context:
+
+| Scenario                                      | Cookie context | Refresh mechanism                                                                                                                              |
+| --------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Protected page load (Server Component render) | read-only      | **Proxy (middleware)** — `src/proxy.ts` refreshes before render and 302s to `?tokenRefreshed=true`, which is stripped on the follow-up request |
+| Server Action / Route Handler                 | writable       | **`$fetch.onError`** → `refreshTokens()` (`src/lib/auth-refresh.ts`) → `retry()` once                                                          |
+
+Key files:
+
+- `src/lib/$fetch.ts` — shared fetch client (cookie forwarding, Set-Cookie relay, 401 refresh + retry)
+- `src/lib/auth-refresh.ts` — refresh helpers (`refreshTokens`, `applySetCookies`, `callRefreshEndpoint`, `isCookieWritable`)
+- `src/proxy.ts` — Proxy guard with silent refresh for protected page loads
+- `src/app/api/auth/refresh/route.ts` — same-origin refresh endpoint (forwards `refreshToken` cookie → relays `Set-Cookie`)
+- `src/app/api/cookies/route.ts`, `src/app/api/retry/route.ts` — cookie-relay / refresh-and-retry proxies
 
 ## 🎨 Styling
 
@@ -281,6 +310,7 @@ pnpm typecheck   # Verify TypeScript types
 ### Husky & lint-staged
 
 Git hooks are automatically installed. Pre-commit hooks will:
+
 - Run ESLint on staged files
 - Format code with Prettier
 - Check TypeScript types
@@ -392,6 +422,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 👤 Author
 
 **Md Abdullah Al Mamun**
+
 - Email: [almamun2b@gmail.com](mailto:almamun2b@gmail.com)
 - Portfolio: [portfolio-mamun.vercel.app](https://portfolio-mamun.vercel.app)
 - GitHub: [@almamun2b](https://github.com/almamun2b)
@@ -417,6 +448,7 @@ If you have any questions or need help, please:
 ## 🎉 Acknowledgments
 
 This template is built with awesome open-source projects:
+
 - [Next.js](https://nextjs.org)
 - [React](https://react.dev)
 - [Tailwind CSS](https://tailwindcss.com)

@@ -7,7 +7,16 @@ import type {
   FetchResponse,
   QueryParams,
   RequestContext,
+  RetryFn,
 } from './types'
+
+/**
+ * Internal per-call retry budget, carried through re-invocations of
+ * `baseFetch` so `onError`'s `retry()` cannot loop forever. Stored on the
+ * merged config as a symbol key so it never collides with user options and
+ * is stripped before the native `fetch` call.
+ */
+const RETRY_BUDGET: unique symbol = Symbol('fetch.retryBudget')
 
 /**
  * Parses a `Response` body according to its `Content-Type` (and status),
@@ -94,6 +103,9 @@ async function baseFetch<
   input: string,
   init: FetchConfig<TResponse, TBody, TParams> = {}
 ): Promise<FetchResponse<TResponse>> {
+  const budget =
+    (init as FetchConfig & Record<symbol, number>)[RETRY_BUDGET] ?? 1
+
   const {
     baseUrl,
     params,
@@ -124,8 +136,30 @@ async function baseFetch<
     } as RequestInit,
   }
 
+  // The retry budget is an internal symbol — never forward it to native fetch.
+  delete (requestContext.init as Record<symbol, unknown>)[RETRY_BUDGET]
+
   if (onRequest) {
     requestContext = await onRequest(requestContext)
+  }
+
+  /**
+   * Re-runs the whole pipeline once with the remaining retry budget.
+   * `onRequest` re-reads cookies/headers on every pass, so a caller that
+   * refreshed the auth token before calling this gets the fresh token
+   * attached automatically. Resolves with `null` if the budget is exhausted
+   * or the retried request also fails.
+   */
+  const retry: RetryFn = async () => {
+    if (budget <= 0) return null
+    try {
+      return await baseFetch(input, {
+        ...init,
+        [RETRY_BUDGET]: budget - 1,
+      } as FetchConfig)
+    } catch {
+      return null
+    }
   }
 
   let rawResponse: Response
@@ -134,7 +168,7 @@ async function baseFetch<
     rawResponse = await fetch(requestContext.url, requestContext.init)
   } catch (error) {
     if (onError) {
-      const handled = await onError(error)
+      const handled = await onError(error, retry)
       if (handled !== undefined) return handled as FetchResponse<TResponse>
     }
     throw error
@@ -160,7 +194,7 @@ async function baseFetch<
     const fetchError = new FetchError<TResponse>(result)
 
     if (onError) {
-      const handled = await onError(fetchError)
+      const handled = await onError(fetchError, retry)
       if (handled !== undefined) return handled as FetchResponse<TResponse>
     }
 

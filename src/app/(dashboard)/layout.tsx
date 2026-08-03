@@ -1,4 +1,4 @@
-import { me } from '@/app/actions/user'
+// import { me } from '@/app/actions/user'
 import { AppBreadcrumb } from '@/components/modules/sidebar/app-breadcrumb'
 import { AppSidebar } from '@/components/modules/sidebar/app-sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -7,14 +7,38 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
+import { IUser } from '@/types/user.types'
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const userResult = await me()
-  const user = userResult.success && userResult.data ? userResult.data : null
+  // const userResult = await me()
+  // const user = userResult.success && userResult.data ? userResult.data : null
+  const user: IUser | null = {
+    id: '1',
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john.doe@example.com',
+    avatar: null,
+    gender: null,
+    phone: null,
+    bio: null,
+    address: null,
+    dateOfBirth: null,
+    timezone: null,
+    locale: null,
+    role: 'USER' as unknown as IUser['role'],
+    status: 'ACTIVE' as unknown as IUser['status'],
+    username: null,
+    isVerified: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastLoginAt: null,
+    verifiedAt: null,
+    deletedAt: null,
+  }
 
   return (
     <SidebarProvider>

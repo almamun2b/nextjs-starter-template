@@ -40,6 +40,7 @@ import { $fetch, createFetch, FetchError } from '@/lib/fetch'
   - [Using `useFetch` with the `api` client (not just Server Actions)](#using-usefetch-with-the-api-client-not-just-server-actions)
 - [Authentication with httpOnly Cookies (Access + Refresh Tokens)](#authentication-with-httponly-cookies-access--refresh-tokens)
   - [Handling HttpOnly Cookie Authentication](#handling-httponly-cookie-authentication)
+  - [Page loads — silent refresh in the Proxy (middleware)](#page-loads--silent-refresh-in-the-proxy-middleware)
   - [Server Components, Server Actions & Route Handlers (Node.js) — cookies are NOT automatic](#server-components-server-actions--route-handlers-nodejs--cookies-are-not-automatic)
   - [CORS note for cross-origin APIs](#cors-note-for-cross-origin-apis)
 - [Full Real-World Example](#full-real-world-example)
@@ -418,7 +419,7 @@ Four hooks are available on both `$fetch` calls and `createFetch()` defaults:
   onResponse: (res: Response) => Response | Promise<Response>
   onSuccess: (res: FetchResponse<T>) =>
     FetchResponse<T> | Promise<FetchResponse<T>>
-  onError: (error: unknown) => unknown | Promise<unknown>
+  onError: (error: unknown, retry: RetryFn) => unknown | Promise<unknown>
 }
 ```
 
@@ -470,6 +471,26 @@ const { data } = await $fetch<{ result: TUsersResponse }>('/users', {
 ### `onError`
 
 Runs whenever a request fails — either an HTTP-level failure (`error` is a `FetchError`) or a network-level failure (`error` is the raw native error). Return a value to have `$fetch` **resolve** with that value instead of throwing; return `undefined` (or just don't return) to let the error keep propagating.
+
+The second argument, **`retry`**, re-runs the exact same request once through the whole pipeline (so `onRequest` re-reads cookies/headers, picking up anything the error handler refreshed). It resolves with the parsed result on success, or `null` when the retry budget was exhausted or the retried request also failed. This is what makes **refresh-then-retry** possible:
+
+```ts
+const api = createFetch({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL,
+  onError: async (error, retry) => {
+    if (error instanceof FetchError && error.status === 401) {
+      await refreshAccessToken() // rotate the tokens (sets new cookies)
+
+      const result = await retry() // re-run once with the fresh cookies
+      if (result) return result // retry succeeded — resolve with it
+    }
+
+    throw error // refresh failed or budget exhausted — propagate the error
+  },
+})
+```
+
+The retry budget defaults to **1** and is stored internally as a symbol key, so `retry()` can never loop forever even if the refreshed tokens are rejected again.
 
 ```ts
 // Recover from a 404 with a default value instead of throwing
@@ -800,23 +821,105 @@ export const clientApi = createFetch({
 
 When Next.js renders a Server Component or executes a Server Action, it runs on the Node.js server. The native `fetch` on the server **does not automatically forward** the client's browser cookies to your backend API.
 
-You must manually forward the incoming cookies using `next/headers`:
+You must manually forward the incoming cookies using `next/headers`. This template implements the full server-side pattern in `src/lib/$fetch.ts` + `src/lib/auth-refresh.ts` (the `$fetch.onError` handler refreshes on `401` and **retries the request once**):
 
 ```ts
+// src/lib/auth-refresh.ts — shared refresh helpers
 import { cookies } from 'next/headers'
 import { parseSetCookie } from 'set-cookie-parser'
-import { createFetch } from './fetch'
-import { FetchError } from './fetch/fetch-error'
 
 type SameSite = 'lax' | 'strict' | 'none' | undefined
 
-// Deduplication promise for concurrent 401 errors
-let refreshPromise: Promise<void> | null = null
-const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1` // `${process.env.NEXT_PUBLIC_SITE_URL}/server`, //While using rewrites
-const refreshUrl = `${baseUrl}/auth/refresh-token`
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
+
+// Calls the backend refresh endpoint with only the refreshToken cookie, using
+// a raw native fetch so we never recurse through $fetch's own onError.
+export const callRefreshEndpoint = (cookieString: string): Promise<Response> =>
+  fetch(`${API_BASE_URL}/auth/refresh-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(cookieString ? { Cookie: cookieString } : {}),
+    },
+    cache: 'no-store',
+  })
+
+// Applies backend Set-Cookie headers onto the Next.js cookie store. Returns
+// false in read-only contexts (Server Component render) instead of throwing.
+export const applySetCookies = async (
+  setCookieHeaders: string[]
+): Promise<boolean> => {
+  if (setCookieHeaders.length === 0) return true
+
+  try {
+    const store = await cookies()
+    for (const cookie of parseSetCookie(setCookieHeaders, {
+      decodeValues: true,
+    })) {
+      const { name, value, ...rest } = cookie
+      store.set(name, value, { ...rest, sameSite: rest.sameSite as SameSite })
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Detects whether the current context can write cookies (Server Action /
+// Route Handler) or is read-only (Server Component render).
+export const isCookieWritable = async (): Promise<boolean> => {
+  const store = await cookies()
+  try {
+    store.set('__auth_probe__', '1', { maxAge: 1 })
+    store.delete('__auth_probe__')
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Refreshes the access/refresh token pair using the refreshToken cookie.
+// Deduplicated across concurrent 401s; skipped in read-only contexts.
+export const refreshTokens = async (): Promise<{
+  ok: boolean
+  status: number
+  applied: boolean
+}> => {
+  if (!(await isCookieWritable())) {
+    return { ok: false, status: 0, applied: false }
+  }
+
+  const key = (await cookies()).get('refreshToken')?.value ?? ''
+  if (!key) return { ok: false, status: 0, applied: false }
+
+  const response = await callRefreshEndpoint(`refreshToken=${key}`)
+  const applied = await applySetCookies(response.headers.getSetCookie?.() ?? [])
+  return { ok: response.ok, status: response.status, applied }
+}
+```
+
+```ts
+// src/lib/$fetch.ts — the pre-configured server-side instance
+import { cookies } from 'next/headers'
+import { applySetCookies, refreshTokens } from '@/lib/auth-refresh'
+import { createFetch } from './fetch'
+import { FetchError } from './fetch/fetch-error'
+
+const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
+
+// Endpoints that must never auto-refresh — a 401 there means bad credentials
+// or an expired link, not an expired access token.
+const NO_REFRESH_PATHS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
+  '/auth/refresh-token',
+]
 
 const $fetch = createFetch({
-  baseUrl: baseUrl,
+  baseUrl,
   headers: { 'Content-Type': 'application/json' },
   credentials: 'include',
 
@@ -835,106 +938,30 @@ const $fetch = createFetch({
   },
 
   onResponse: async (res) => {
-    // Forward any Set-Cookie headers from the backend back to the browser.
-    const setCookieHeaders = res.headers.getSetCookie?.() ?? []
-
-    if (setCookieHeaders.length > 0) {
-      const parsedCookies = parseSetCookie(setCookieHeaders, {
-        decodeValues: true,
-      })
-      const cookieStore = await cookies()
-
-      for (const cookie of parsedCookies) {
-        const { name, value, ...rest } = cookie
-        const options: Parameters<typeof cookieStore.set>[2] = {
-          ...rest,
-          sameSite: rest.sameSite as SameSite,
-        }
-        try {
-          cookieStore.set(name, value, options)
-        } catch {
-          // Silently ignore — cookies().set() throws when called inside a
-          // Server Component render (read-only context). It works fine in
-          // Server Actions and Route Handlers.
-        }
-      }
-    }
-
+    // Forward backend Set-Cookie (e.g. refreshed tokens) back to the browser.
+    // Best-effort: silently skipped when the current context is read-only.
+    await applySetCookies(res.headers.getSetCookie?.() ?? [])
     return res
   },
 
-  onError: async (error: unknown) => {
-    // Auto-refresh on 401 errors
+  onError: async (error, retry) => {
     if (error instanceof FetchError && error.status === 401) {
-      // Deduplicate refresh calls to prevent multiple concurrent refreshes
-      if (!refreshPromise) {
-        refreshPromise = (async () => {
-          try {
-            // Call refresh endpoint directly using native fetch to avoid circular dependency
-            const cookieStore = await cookies()
-            const cookieString = cookieStore.toString()
+      const isAuthEndpoint = NO_REFRESH_PATHS.some((path) =>
+        error.url.includes(path)
+      )
 
-            const headers = new Headers({
-              'Content-Type': 'application/json',
-            })
+      if (!isAuthEndpoint) {
+        const { ok, applied } = await refreshTokens()
 
-            if (cookieString) {
-              headers.set('Cookie', cookieString)
-            }
-
-            const response = await fetch(refreshUrl, {
-              method: 'POST',
-              headers,
-              credentials: 'include',
-            })
-
-            // Forward Set-Cookie headers from refresh response using robust parser
-            const setCookieHeaders = response.headers.getSetCookie?.() ?? []
-            if (setCookieHeaders.length > 0) {
-              const parsedCookies = parseSetCookie(setCookieHeaders, {
-                decodeValues: true,
-              })
-
-              for (const cookie of parsedCookies) {
-                const { name, value, ...rest } = cookie
-                const options: Parameters<typeof cookieStore.set>[2] = {
-                  ...rest,
-                  sameSite: rest.sameSite as SameSite,
-                }
-                try {
-                  cookieStore.set(name, value, options)
-                } catch {
-                  // Silently ignore
-                }
-              }
-            }
-
-            if (!response.ok) {
-              throw new Error(`Token refresh failed: ${response.status}`)
-            }
-
-            console.log('[fetch] Token refreshed successfully')
-          } catch (refreshError) {
-            console.error('[fetch] Token refresh failed:', refreshError)
-            throw refreshError
-          }
-        })().finally(() => {
-          refreshPromise = null
-        })
+        // Only retry when the new cookies actually landed in the store —
+        // in a read-only context a retry would just 401 again.
+        if (ok && applied) {
+          const result = await retry()
+          if (result) return result
+        }
       }
-
-      try {
-        await refreshPromise
-      } catch {
-        // Refresh failed - rethrow the original 401 error
-        throw error
-      }
-
-      // Refresh succeeded - rethrow the original 401 error so caller can retry
-      throw error
     }
 
-    console.error('Fetch error:', error)
     throw error
   },
 })
@@ -942,7 +969,72 @@ const $fetch = createFetch({
 export { $fetch }
 ```
 
-> **Note:** `cookies().set()` from `next/headers` throws when called inside a Server Component's render (read-only context). The `onResponse` cookie-write logic is silently ignored there — it only takes effect inside Server Actions and Route Handlers.
+> **Note:** `cookies().set()` from `next/headers` throws when called inside a Server Component's render (read-only context). The `onResponse` cookie-write logic and `refreshTokens()` are silently skipped there — they only take effect inside Server Actions and Route Handlers.
+
+### Page loads — silent refresh in the Proxy (middleware)
+
+The read-only constraint above has an important consequence: **`$fetch.onError` can never refresh during a Server Component render.** If you navigate to a protected page with an expired `accessToken` but a valid `refreshToken` cookie, the render's API call gets a `401` and there is no writable cookie context to rotate the tokens in — the page would just fail.
+
+This template solves it in `src/proxy.ts` (Next.js Proxy / middleware), which runs **before** rendering and can write cookies to its response:
+
+1. On a protected **GET** with an expired/missing `accessToken` but a present `refreshToken`, the Proxy calls the backend refresh endpoint with `Cookie: refreshToken=...`.
+2. On success it returns a **302 redirect** to the same URL tagged `?tokenRefreshed=true`, attaching the backend's `Set-Cookie` headers (new access + refresh tokens) to the redirect response — the browser stores them.
+3. The follow-up request hits the Proxy again; it strips the `tokenRefreshed` tag and lets the page render with the fresh cookies.
+
+The flow avoids refreshing during render and adds only one extra redirect, and only when the token actually expired:
+
+```ts
+// src/proxy.ts (abridged) — silent refresh for protected page loads
+const REFRESH_ENDPOINT = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh-token`
+
+export async function proxy(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl
+
+  // Step 2: strip the tag added after a successful refresh.
+  if (searchParams.has('tokenRefreshed')) {
+    const cleanUrl = request.nextUrl.clone()
+    cleanUrl.searchParams.delete('tokenRefreshed')
+    return NextResponse.redirect(cleanUrl)
+  }
+
+  const accessToken = request.cookies.get('accessToken')?.value
+  const refreshToken = request.cookies.get('refreshToken')?.value
+  const hasValidAccess = !!accessToken && !isAccessTokenExpired(accessToken)
+
+  if (isProtectedRoute(pathname) && !hasValidAccess) {
+    // Server Actions / Route Handlers refresh themselves; only GET here.
+    if (request.method === 'GET' && refreshToken) {
+      const response = await fetch(REFRESH_ENDPOINT, {
+        method: 'POST',
+        headers: { Cookie: `refreshToken=${refreshToken}` },
+      })
+
+      if (response.ok) {
+        const refreshUrl = request.nextUrl.clone()
+        refreshUrl.searchParams.set('tokenRefreshed', 'true')
+        const res = NextResponse.redirect(refreshUrl)
+        for (const setCookie of response.headers.getSetCookie?.() ?? []) {
+          res.headers.append('Set-Cookie', setCookie)
+        }
+        return res
+      }
+    }
+
+    // Refresh failed and no valid access token — logged out.
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  return NextResponse.next()
+}
+```
+
+So the refresh strategy is layered:
+
+| Where a 401 happens                                        | Cookie context | Who refreshes                                                |
+| ---------------------------------------------------------- | -------------- | ------------------------------------------------------------ |
+| Protected page load (Server Component render)              | read-only      | **Proxy (middleware)** — refresh + `tokenRefreshed` redirect |
+| Server Action / Route Handler                              | writable       | **`$fetch.onError` → `refreshTokens()` → `retry()`**         |
+| Auth endpoints (`/auth/login`, `/auth/refresh-token`, ...) | —              | never (a 401 there means bad credentials)                    |
 
 ---
 
@@ -1416,7 +1508,9 @@ export async function getUsersServer(params: TUserQueryOptions) {
 }
 ```
 
-This has to be called from something that can write cookies (a Server Action, or a Route Handler), since `refreshAccessTokenServer()` calls `cookies().set(...)` internally — calling `getUsersServer` directly from a Server Component's render will throw when the refresh path is hit. Wrap Server Component data-fetching in a Route Handler or Server Action if a 401 refresh needs to happen during that page's render, or catch the 401 in the Server Component and `redirect('/login')` instead of attempting a refresh there.
+This has to be called from something that can write cookies (a Server Action, or a Route Handler), since `refreshAccessTokenServer()` calls `cookies().set(...)` internally — calling `getUsersServer` directly from a Server Component's render will throw when the refresh path is hit.
+
+> **In this template, page loads don't need this wrapper at all.** The Proxy (middleware) refreshes tokens _before_ the Server Component renders (see [Page loads — silent refresh in the Proxy](#page-loads--silent-refresh-in-the-proxy-middleware)), so render-time `401`s are prevented rather than recovered. `$fetch.onError`'s refresh-and-retry covers the Server Action / Route Handler paths.
 
 #### 5. Logout via a Server Action
 
@@ -1466,11 +1560,15 @@ A complete, end-to-end setup showing the **actual pattern used in this project**
 
 ```ts
 // src/lib/$fetch.ts — the pre-configured server-side instance
+// (see the "Handling HttpOnly Cookie Authentication" section for the full
+// implementation: onRequest forwards cookies, onResponse relays Set-Cookie,
+// onError refreshes on 401 and retries once via auth-refresh.ts)
 import { cookies } from 'next/headers'
+import { applySetCookies } from '@/lib/auth-refresh'
 import { createFetch } from '@/lib/fetch'
 
 export const $fetch = createFetch({
-  baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`,
+  baseUrl: `${process.env.NEXT_PUBLIC_API_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
   credentials: 'include',
 
@@ -1487,15 +1585,8 @@ export const $fetch = createFetch({
   },
 
   onResponse: async (res) => {
-    // Forward any Set-Cookie headers back to the browser (e.g. token rotation)
-    const setCookieHeaders = res.headers.getSetCookie?.() ?? []
-    if (setCookieHeaders.length > 0) {
-      const cookieStore = await cookies()
-      for (const raw of setCookieHeaders) {
-        // ... parse and set (see src/lib/$fetch.ts for full implementation)
-        ;(void raw, cookieStore)
-      }
-    }
+    // Forward backend Set-Cookie back to the browser (e.g. token rotation)
+    await applySetCookies(res.headers.getSetCookie?.() ?? [])
     return res
   },
 })
@@ -1620,7 +1711,7 @@ The core fetch wrapper. Also exposes `.get`, `.post`, `.put`, `.patch`, `.delete
   - `params?: TParams`
   - `body?: TBody | BodyInit | null`
   - `next?: { revalidate?: number | false; tags?: string[] }`
-  - `onRequest? / onResponse? / onSuccess? / onError?`
+  - `onRequest? / onResponse? / onSuccess? / onError?` — `onError` receives `(error, retry)` where `retry` re-runs the request once with fresh headers (see [`onError`](#onerror)).
 - Returns: `Promise<FetchResponse<TResponse>>`
 - Throws: `FetchError` on HTTP failure, or the original native error on network failure (unless recovered by `onError`).
 
@@ -1641,4 +1732,4 @@ Client Component hook (`'use client'`) that wraps any async function — a Serve
 
 ### Types
 
-`FetchConfig`, `FetchResponse`, `FetchHooks`, `CreateFetchConfig`, `RequestContext`, `QueryParams`, `QueryParamValue`, `Primitive`, `FetchBody`, `NextFetchRequestConfig`, `FetchFn`, `FetchMethods`, `OnRequestHook`, `OnResponseHook`, `OnSuccessHook`, `OnErrorHook`, `FetchStatus`, `UseFetchOptions`, `UseFetchResult` — all exported from `@/lib/fetch`.
+`FetchConfig`, `FetchResponse`, `FetchHooks`, `CreateFetchConfig`, `RequestContext`, `QueryParams`, `QueryParamValue`, `Primitive`, `FetchBody`, `NextFetchRequestConfig`, `FetchFn`, `FetchMethods`, `OnRequestHook`, `OnResponseHook`, `OnSuccessHook`, `OnErrorHook`, `RetryFn`, `FetchStatus`, `UseFetchOptions`, `UseFetchResult` — all exported from `@/lib/fetch`.
