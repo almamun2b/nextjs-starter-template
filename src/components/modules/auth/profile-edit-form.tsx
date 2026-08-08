@@ -1,6 +1,7 @@
 'use client'
 
 import { updateMyProfile } from '@/app/actions/user'
+import { useAuth } from '@/context/auth-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,10 +44,6 @@ import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import z from 'zod/v3'
 
-interface ProfileEditFormProps {
-  user: IUser
-}
-
 type FormData = z.infer<typeof profileFormSchema>
 
 const GENDER_OPTIONS = [
@@ -70,30 +67,39 @@ function toDateInputValue(value: string | Date | null): string {
   return date.toISOString().split('T')[0]
 }
 
-export function ProfileEditForm({ user }: ProfileEditFormProps) {
+export function ProfileEditForm() {
+  const { user } = useAuth()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const form = useForm<FormData>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      firstName: user.firstName ?? '',
-      lastName: user.lastName ?? '',
-      phone: user.phone ?? '',
-      bio: user.bio ?? '',
+      firstName: user?.firstName ?? '',
+      lastName: user?.lastName ?? '',
+      phone: user?.phone ?? '',
+      bio: user?.bio ?? '',
       gender:
-        user.gender !== null && user.gender !== undefined
-          ? ((typeof user.gender === 'number'
+        user?.gender !== null && user?.gender !== undefined
+          ? ((typeof user?.gender === 'number'
               ? Gender[user.gender]
               : user.gender) as FormData['gender'])
           : '',
-      address: user.address ?? '',
-      dateOfBirth: toDateInputValue(user.dateOfBirth),
-      timezone: user.timezone ?? '',
-      locale: user.locale ?? '',
+      address: user?.address ?? '',
+      dateOfBirth: toDateInputValue(user?.dateOfBirth ?? null),
+      timezone: user?.timezone ?? '',
+      locale: user?.locale ?? '',
     },
     mode: 'onChange',
   })
+
+  if (!user) {
+    return (
+      <div className="rounded-lg border border-destructive/50 p-6 text-center text-destructive">
+        Failed to load profile. Please try again later.
+      </div>
+    )
+  }
 
   const onSubmit = (data: FormData) => {
     startTransition(async () => {

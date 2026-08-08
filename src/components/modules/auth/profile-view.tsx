@@ -1,5 +1,6 @@
 'use client'
 
+import { useAuth } from '@/context/auth-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,10 +15,6 @@ import { Separator } from '@/components/ui/separator'
 import { Gender, type IUser } from '@/types/user.types'
 import { PencilIcon } from 'lucide-react'
 import Link from 'next/link'
-
-interface ProfileViewProps {
-  user: IUser
-}
 
 const GENDER_OPTIONS = [
   { value: 'MALE', label: 'Male' },
@@ -65,7 +62,17 @@ function FieldRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function ProfileView({ user }: ProfileViewProps) {
+export function ProfileView() {
+  const { user } = useAuth()
+
+  if (!user) {
+    return (
+      <div className="rounded-lg border border-destructive/50 p-6 text-center text-destructive">
+        Failed to load profile. Please try again later.
+      </div>
+    )
+  }
+
   const initials = getInitials(user)
   const avatarUrl = user.avatar?.url ?? null
 

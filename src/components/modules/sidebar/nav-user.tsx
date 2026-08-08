@@ -1,6 +1,6 @@
 'use client'
 
-import { logoutUser } from '@/app/actions/auth'
+import { useAuth } from '@/context/auth-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -21,10 +21,6 @@ import { ChevronsUpDownIcon, LogOutIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
-interface NavUserProps {
-  user: IUser | null
-}
-
 function getInitials(user: IUser | null): string {
   if (!user) return 'U'
   if (user.firstName && user.lastName) {
@@ -42,7 +38,8 @@ function getDisplayName(user: IUser | null): string {
   return user.email.split('@')[0]
 }
 
-export function NavUser({ user }: NavUserProps) {
+export function NavUser() {
+  const { user, logout } = useAuth()
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -54,7 +51,7 @@ export function NavUser({ user }: NavUserProps) {
 
   const handleLogout = () => {
     startTransition(async () => {
-      const result = await logoutUser()
+      const result = await logout()
       if (result.success) {
         router.push('/login')
       }

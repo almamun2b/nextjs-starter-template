@@ -80,10 +80,13 @@ const tryRefreshTokens = async (refreshToken: string): Promise<string[]> => {
  *   refresh path (`$fetch.onError` → `refreshTokens()`); this Proxy leaves
  *   non-GET requests alone so it never hijacks an in-flight action.
  *
- * Refresh flow: on a protected GET with an expired/missing access token but a
+ * Refresh flow: on any GET with an expired/missing access token but a
  * present refresh token, call the backend, attach the new Set-Cookie headers
  * to a redirect tagged `?tokenRefreshed=true`, then strip the tag on the
- * follow-up request so the page renders with the fresh cookies.
+ * follow-up request so the page renders with the fresh cookies. This runs
+ * for *every* route (not just protected ones) because the root layout
+ * fetches the current user on all pages — a stale access token there would
+ * otherwise surface as a 401 with no way to refresh in the read-only render.
  */
 export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
@@ -106,26 +109,28 @@ export async function proxy(request: NextRequest) {
   const refreshToken = request.cookies.get('refreshToken')?.value
   const hasValidAccess = !!accessToken && !isAccessTokenExpired(accessToken)
 
-  if (isProtected && !hasValidAccess) {
-    // Only GET navigations refresh here — Server Actions / Route Handlers
-    // handle refresh themselves in their writable cookie context.
-    if (request.method === 'GET' && refreshToken) {
-      const setCookies = await tryRefreshTokens(refreshToken)
+  // Silent refresh on every GET route: if the access token is expired or
+  // missing but a refresh token exists, rotate the pair before the page
+  // renders. Only GET navigations refresh here — Server Actions / Route
+  // Handlers handle refresh themselves in their writable cookie context.
+  if (!hasValidAccess && request.method === 'GET' && refreshToken) {
+    const setCookies = await tryRefreshTokens(refreshToken)
 
-      if (setCookies.length > 0) {
-        const refreshUrl = request.nextUrl.clone()
-        refreshUrl.searchParams.set('tokenRefreshed', 'true')
+    if (setCookies.length > 0) {
+      const refreshUrl = request.nextUrl.clone()
+      refreshUrl.searchParams.set('tokenRefreshed', 'true')
 
-        const response = NextResponse.redirect(refreshUrl)
-        for (const setCookie of setCookies) {
-          response.headers.append('Set-Cookie', setCookie)
-        }
-        return response
+      const response = NextResponse.redirect(refreshUrl)
+      for (const setCookie of setCookies) {
+        response.headers.append('Set-Cookie', setCookie)
       }
+      return response
     }
+  }
 
-    // No refresh possible (missing refresh token) or the refresh failed with
-    // no valid access token left — the user is effectively logged out.
+  // No valid access token left on a protected route — the user is
+  // effectively logged out (either no refresh token, or the refresh failed).
+  if (isProtected && !hasValidAccess) {
     if (!refreshToken || request.method === 'GET') {
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
