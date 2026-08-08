@@ -48,7 +48,7 @@ const registerUser = async (
 
 const resendVerificationCode = async (
   data: TResendVerificationCodeInput
-): Promise<IResponse | IErrorResponse> => {
+): Promise<IResponse> => {
   try {
     const { data: response } = await $fetch.post<
       IResponse,
@@ -57,7 +57,7 @@ const resendVerificationCode = async (
 
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
@@ -76,7 +76,7 @@ const verifyEmail = async (
   }
 }
 
-const refreshToken = async (): Promise<IResponse | IErrorResponse> => {
+const refreshToken = async (): Promise<IResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>(
       '/auth/refresh-token'
@@ -84,17 +84,17 @@ const refreshToken = async (): Promise<IResponse | IErrorResponse> => {
 
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
-const logoutUser = async (): Promise<IResponse | IErrorResponse> => {
+const logoutUser = async (): Promise<IResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>('/auth/logout')
 
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
@@ -115,7 +115,7 @@ const forgotPassword = async (
 
 const resendForgotPassword = async (
   data: TForgotPasswordInput
-): Promise<IResponse | IErrorResponse> => {
+): Promise<IResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>(
       '/auth/resend-forgot-password',
@@ -124,7 +124,7 @@ const resendForgotPassword = async (
 
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 

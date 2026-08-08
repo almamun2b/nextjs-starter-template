@@ -1,7 +1,6 @@
 'use client'
 
 import { logoutUser } from '@/app/actions/auth'
-import { useAuth } from '@/providers/auth-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -17,6 +16,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { useAuth } from '@/providers/auth-provider'
 import type { IUser } from '@/types/user.types'
 import { ChevronsUpDownIcon, LogOutIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -52,9 +52,13 @@ export function NavUser() {
 
   const handleLogout = () => {
     startTransition(async () => {
-      const result = await logoutUser()
-      if (result.success) {
-        router.push('/login')
+      try {
+        const result = await logoutUser()
+        if (result.success) {
+          router.push('/login')
+        }
+      } catch (error) {
+        console.error(error)
       }
     })
   }

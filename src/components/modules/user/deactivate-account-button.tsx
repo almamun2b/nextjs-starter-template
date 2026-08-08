@@ -32,15 +32,18 @@ export function DeactivateAccountButton() {
 
   const handleDeactivate = () => {
     startTransition(async () => {
-      const result = await deactivateMyAccount()
+      try {
+        const result = await deactivateMyAccount()
 
-      if (result.success) {
-        toast.success(result.message)
-        router.push('/login')
-        return
+        if (result.success) {
+          toast.success(result.message)
+          router.push('/login')
+          return
+        }
+      } catch (error) {
+        const err = error as Error
+        toast.error(err.message)
       }
-
-      toast.error(result.message)
     })
   }
 

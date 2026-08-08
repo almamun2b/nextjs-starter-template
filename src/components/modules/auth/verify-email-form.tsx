@@ -105,22 +105,17 @@ export function VerifyEmailForm({ email, ...props }: TVerifyEmailFormProps) {
     if (cooldown > 0 || isPending) return
 
     startTransition(async () => {
-      const result = await resendVerificationCode({ email })
+      try {
+        const result = await resendVerificationCode({ email })
 
-      if (result.success) {
-        toast.success(result.message)
-        startCooldown()
-        return
-      }
-
-      if ('errors' in result && result.errors && result.errors.length) {
-        for (const { field, message } of result.errors) {
-          if (field && isFormInputField(field, form.getValues())) {
-            form.setError(field, { message: message ?? 'Unknown Error' })
-          }
+        if (result.success) {
+          toast.success(result.message)
+          startCooldown()
+          return
         }
-      } else {
-        toast.error(result.message)
+      } catch (error) {
+        const err = error as Error
+        toast.error(err.message || 'Failed to resend verification code')
       }
     })
   }

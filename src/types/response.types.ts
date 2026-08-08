@@ -7,7 +7,7 @@ interface IMeta {
 
 type SortOrder = 'asc' | 'desc'
 
-type CursorSortDirection = 'forward' | 'backward'
+type CursorDirection = 'forward' | 'backward'
 
 interface IMetaCursor {
   limit: number
@@ -31,13 +31,12 @@ interface IResponse {
 }
 
 interface IErrorResponse extends IResponse {
-  success: false
   errors: IErrors[] | null
   code: string
 }
 
 export type {
-  CursorSortDirection,
+  CursorDirection,
   IErrorResponse,
   IMeta,
   IMetaCursor,
