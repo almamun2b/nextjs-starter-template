@@ -1,20 +1,9 @@
-import { me } from '@/app/actions/user'
 import { ProfileEditForm } from '@/components/modules/auth/profile-edit-form'
 
 const ProfileEditPage = async () => {
-  const result = await me()
-
-  if (result.success && result.data) {
-    return (
-      <div className="space-y-6">
-        <ProfileEditForm user={result.data} />
-      </div>
-    )
-  }
-
   return (
-    <div className="rounded-lg border border-destructive/50 p-6 text-center text-destructive">
-      Failed to load profile. Please try again later.
+    <div className="space-y-6">
+      <ProfileEditForm />
     </div>
   )
 }

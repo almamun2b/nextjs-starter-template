@@ -11,7 +11,6 @@ import {
   SidebarHeader,
   SidebarRail,
 } from '@/components/ui/sidebar'
-import type { IUser } from '@/types/user.types'
 import {
   GalleryVerticalEnd,
   KeyRound,
@@ -21,9 +20,7 @@ import {
   Users,
 } from 'lucide-react'
 
-interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  user: IUser | null
-}
+type AppSidebarProps = React.ComponentProps<typeof Sidebar>
 
 const navMain = {
   label: 'Dashboard',
@@ -67,7 +64,7 @@ const navSecondary = {
   ],
 }
 
-export function AppSidebar({ user, ...props }: AppSidebarProps) {
+export function AppSidebar(props: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="flex h-16 flex-row border-b">
@@ -85,7 +82,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <NavMain group={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
