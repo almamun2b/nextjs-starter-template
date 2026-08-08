@@ -11,9 +11,13 @@ export function LogoutButton() {
 
   const handleLogout = () => {
     startTransition(async () => {
-      const result = await logoutUser()
-      if (result.success) {
-        router.push('/login')
+      try {
+        const result = await logoutUser()
+        if (result.success) {
+          router.push('/login')
+        }
+      } catch (error) {
+        console.error(error)
       }
     })
   }

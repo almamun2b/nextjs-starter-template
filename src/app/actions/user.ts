@@ -17,9 +17,10 @@ import type {
   UpdateAvatarInput,
 } from '@/types/user.types'
 
+// super and admin only
 const getAllUsers = async (
   params: TUserQueryOptions
-): Promise<TUsersResponse | IErrorResponse> => {
+): Promise<TUsersResponse> => {
   try {
     const { data: response } = await $fetch.get<
       TUsersResponse,
@@ -29,10 +30,11 @@ const getAllUsers = async (
     })
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
+// super and admin only
 const createUserManually = async (
   data: TCreateUserInput
 ): Promise<TUserResponse | IErrorResponse> => {
@@ -47,15 +49,17 @@ const createUserManually = async (
   }
 }
 
-const me = async (): Promise<TUserResponse | IErrorResponse> => {
+// super, admin and user only
+const me = async (): Promise<TUserResponse> => {
   try {
     const { data: response } = await $fetch.get<TUserResponse>('/users/me')
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
+// super, admin and user only
 const updateMyProfile = async (
   data: TUpdateProfileInput
 ): Promise<TUserResponse | IErrorResponse> => {
@@ -70,6 +74,7 @@ const updateMyProfile = async (
   }
 }
 
+// super, admin and user only
 const updateMyProfileWihAvatar = async (
   data: TUpdateProfileWithAvatarInput
 ): Promise<TUserResponse | IErrorResponse> => {
@@ -94,6 +99,7 @@ const updateMyProfileWihAvatar = async (
   }
 }
 
+// super, admin and user only
 const updateMyAvatarOnly = async (
   data: UpdateAvatarInput
 ): Promise<TUserResponse | IErrorResponse> => {
@@ -110,16 +116,18 @@ const updateMyAvatarOnly = async (
   }
 }
 
-const deleteMyAvatar = async (): Promise<TUserResponse | IErrorResponse> => {
+// super, admin and user only
+const deleteMyAvatar = async (): Promise<TUserResponse> => {
   try {
     const { data: response } =
       await $fetch.delete<TUserResponse>('/users/me/avatar')
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
+// super, admin and user only
 const changeMyPassword = async (
   data: TChangePasswordInput
 ): Promise<IResponse | IErrorResponse> => {
@@ -134,9 +142,8 @@ const changeMyPassword = async (
   }
 }
 
-const deactivateMyAccount = async (): Promise<
-  TUserResponse | IErrorResponse
-> => {
+// super, admin and user only
+const deactivateMyAccount = async (): Promise<TUserResponse> => {
   try {
     const { data: response } = await $fetch.patch<
       TUserResponse,
@@ -144,13 +151,12 @@ const deactivateMyAccount = async (): Promise<
     >('/users/me/deactivate')
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
-const reactivateMyAccount = async (): Promise<
-  TUserResponse | IErrorResponse
-> => {
+// super, admin and user only
+const reactivateMyAccount = async (): Promise<TUserResponse> => {
   try {
     const { data: response } = await $fetch.patch<
       TUserResponse,
@@ -158,25 +164,25 @@ const reactivateMyAccount = async (): Promise<
     >('/users/me/reactivate')
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
-const getUserById = async (
-  id: string
-): Promise<TUserResponse | IErrorResponse> => {
+// super and admin only
+const getUserById = async (id: string): Promise<TUserResponse> => {
   try {
     const { data: response } = await $fetch.get<TUserResponse>(`/users/${id}`)
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
+// super and admin only
 const updateUserStatus = async (
   id: string,
   data: TUpdateStatusInput
-): Promise<TUserResponse | IErrorResponse> => {
+): Promise<TUserResponse> => {
   try {
     const { data: response } = await $fetch.patch<
       TUserResponse,
@@ -184,14 +190,15 @@ const updateUserStatus = async (
     >(`/users/${id}/status`, { body: data })
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
+// super only
 const updateUserRole = async (
   id: string,
   data: TUpdateRoleInput
-): Promise<TUserResponse | IErrorResponse> => {
+): Promise<TUserResponse> => {
   try {
     const { data: response } = await $fetch.patch<
       TUserResponse,
@@ -199,33 +206,31 @@ const updateUserRole = async (
     >(`/users/${id}/role`, { body: data })
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
-const deleteUserSoft = async (
-  id: string
-): Promise<TUserResponse | IErrorResponse> => {
+// super and admin only
+const deleteUserSoft = async (id: string): Promise<TUserResponse> => {
   try {
     const { data: response } = await $fetch.delete<TUserResponse>(
       `/users/${id}`
     )
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 
-const deleteUserHard = async (
-  id: string
-): Promise<TUserDeleteResponse | IErrorResponse> => {
+// super only
+const deleteUserHard = async (id: string): Promise<TUserDeleteResponse> => {
   try {
     const { data: response } = await $fetch.delete<TUserDeleteResponse>(
       `/users/${id}/hard`
     )
     return response
   } catch (error) {
-    return handleFetchError(error)
+    throw error
   }
 }
 

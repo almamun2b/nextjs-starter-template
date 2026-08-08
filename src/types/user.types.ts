@@ -1,11 +1,6 @@
 import { changePasswordSchema } from '@/validation/user.validation'
-import {
-  CursorSortDirection,
-  IMeta,
-  IResponse,
-  SortOrder,
-} from './response.types'
 import z from 'zod/v3'
+import { CursorDirection, IMeta, IResponse, SortOrder } from './response.types'
 
 enum UserRole {
   SUPER_ADMIN,
@@ -85,7 +80,7 @@ type TUserQueryOptions = {
   sortBy?: string
   sortOrder?: SortOrder
   cursor?: string
-  direction?: CursorSortDirection
+  direction?: CursorDirection
   searchTerm?: string
   role?: UserRole
   status?: UserStatus
