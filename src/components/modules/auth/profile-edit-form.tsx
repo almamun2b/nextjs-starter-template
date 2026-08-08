@@ -1,8 +1,8 @@
 'use client'
 
 import { updateMyProfile } from '@/app/actions/user'
+import { AvatarUploader } from '@/components/modules/user/avatar-uploader'
 import { useAuth } from '@/providers/auth-provider'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -143,21 +143,13 @@ export function ProfileEditForm() {
   return (
     <div className="mx-auto w-full max-w-2xl">
       <Card>
-        <CardHeader>
+        <CardHeader className="gap-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-14 rounded-full ring-2 ring-border">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={initials} />}
-                <AvatarFallback className="rounded-full text-base font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <CardTitle>Edit Profile</CardTitle>
-                <CardDescription>
-                  Update your personal information below
-                </CardDescription>
-              </div>
+            <div>
+              <CardTitle>Edit Profile</CardTitle>
+              <CardDescription>
+                Update your personal information below
+              </CardDescription>
             </div>
             <Button variant="ghost" size="icon" asChild>
               <Link href="/profile">
@@ -165,6 +157,7 @@ export function ProfileEditForm() {
               </Link>
             </Button>
           </div>
+          <AvatarUploader avatarUrl={avatarUrl} initials={initials} />
         </CardHeader>
 
         <CardContent>

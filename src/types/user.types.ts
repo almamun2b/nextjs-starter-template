@@ -1,4 +1,7 @@
-import { changePasswordSchema } from '@/validation/user.validation'
+import {
+  changePasswordSchema,
+  createUserSchema,
+} from '@/validation/user.validation'
 import z from 'zod/v3'
 import { CursorDirection, IMeta, IResponse, SortOrder } from './response.types'
 
@@ -145,12 +148,15 @@ type TChangePasswordInput = {
 
 type TChangePasswordForm = z.infer<typeof changePasswordSchema>
 
+type TCreateUserForm = z.infer<typeof createUserSchema>
+
 export { Gender, UserRole, UserStatus }
 export type {
   IAvatar,
   IUser,
   TChangePasswordForm,
   TChangePasswordInput,
+  TCreateUserForm,
   TCreateUserInput,
   TUpdateProfileInput,
   TUpdateProfileWithAvatarInput,
