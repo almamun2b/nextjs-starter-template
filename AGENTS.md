@@ -41,14 +41,15 @@ No test runner is installed — do not assume a test command exists.
 - Route groups: `(public)/` for public pages, `(auth)/` for login/signup, `(dashboard)/` for authenticated pages with sidebar.
 - Server Actions live in `src/app/actions/` — default place for auth mutations and backend calls from forms.
 - Client-side data fetching goes through the shared fetch layer in `src/lib/`.
-- `src/proxy.ts` is a placeholder middleware (matcher: `/api/auth/*`); currently redirects to `/home`.
+- `src/proxy.ts` handles auth: silently refreshes tokens on protected page loads before Server Components render (302 → `?tokenRefreshed=true`, stripped on the follow-up request); redirects to `/login` when unauthenticated. Excludes `/api/*` routes. Non-GET requests (Server Actions/Route Handlers) are left to the in-app refresh.
 
 ## Data layer and API conventions
 
 - API client configured in `src/lib/$fetch.ts` using `createFetch()` from `src/lib/fetch/`.
-- Auto-refresh on 401 is built into `$fetch` (via `onError` handler); do not duplicate.
+- Auto-refresh on 401 is built into `$fetch` (via `onError` → `refreshTokens()` → `retry()`); refresh helpers live in `src/lib/auth-refresh.ts`. Do not duplicate this logic.
+- Page-load refresh happens in `src/proxy.ts` (middleware) — Server Component renders are read-only and cannot refresh in-render.
 - Rewrite in `next.config.ts` maps `/server/:path*` → `${NEXT_PUBLIC_API_URL}/api/v1/:path*`.
-- Cookie propagation and Set-Cookie forwarding handled in `$fetch`; do not reimplement.
+- Cookie propagation and Set-Cookie forwarding handled in `$fetch` + `src/lib/auth-refresh.ts`; do not reimplement.
 - Server Actions use `$fetch.post<T>()` patterns (not raw `fetch`) and call `revalidateTag` with cache tags from `src/constant/tags.ts`.
 - Client async state: prefer `useFetch` hook from `src/lib/fetch/use-fetch.ts` over custom loading/error logic.
 
@@ -65,7 +66,7 @@ No test runner is installed — do not assume a test command exists.
 - For new features, place pages under the appropriate route-group folder in `src/app/` and keep feature-specific UI in `src/components/modules/`.
 - For mutations and server-side auth flows, use Server Actions in `src/app/actions/` and revalidate relevant tags from `src/constant/tags.ts`.
 - For client-side data fetching, prefer the shared `useFetch` hook from `src/lib/fetch/use-fetch.ts` over custom loading/error state.
-- If a change touches auth, cookies, or token refresh, preserve the existing HttpOnly cookie flow in `src/lib/$fetch.ts`; do not move token handling to `localStorage`.
+- If a change touches auth, cookies, or token refresh, preserve the existing HttpOnly cookie flow in `src/lib/$fetch.ts` + `src/lib/auth-refresh.ts` + `src/proxy.ts`; do not move token handling to `localStorage`.
 - Reuse existing validation schemas and shared types instead of introducing ad hoc types or duplicate logic.
 
 ## Styling and code style
