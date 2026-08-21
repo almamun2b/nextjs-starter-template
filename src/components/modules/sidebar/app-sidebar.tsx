@@ -15,7 +15,6 @@ import {
   GalleryVerticalEnd,
   KeyRound,
   Layout,
-  Settings,
   UserIcon,
   Users,
 } from 'lucide-react'
@@ -43,12 +42,6 @@ const navMain = {
 const navSecondary = {
   label: 'Settings',
   items: [
-    {
-      title: 'Settings',
-      url: '/settings',
-      icon: Settings,
-      isActive: false,
-    },
     {
       title: 'Profile',
       url: '/profile',

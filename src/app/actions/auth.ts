@@ -91,6 +91,7 @@ const refreshToken = async (): Promise<IResponse> => {
 const logoutUser = async (): Promise<IResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>('/auth/logout')
+    revalidateTag(CACHE_TAGS.PROFILE, 'max')
 
     return response
   } catch (error) {

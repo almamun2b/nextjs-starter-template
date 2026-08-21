@@ -1,7 +1,6 @@
 'use client'
 
 import { updateMyProfile } from '@/app/actions/user'
-import { useAuth } from '@/providers/auth-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,11 +28,9 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { isFormInputField } from '@/lib/form'
-import {
-  Gender,
-  type IUser,
-  type TUpdateProfileInput,
-} from '@/types/user.types'
+import { useAuth } from '@/providers/auth-provider'
+import { Gender } from '@/types/enum.types'
+import type { IUser, TUpdateProfileInput } from '@/types/user.types'
 import { profileFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeftIcon, Loader2Icon } from 'lucide-react'

@@ -1,28 +1,7 @@
 import { changePasswordSchema } from '@/validation/user.validation'
 import z from 'zod/v3'
+import { Gender, UserRole, UserStatus } from './enum.types'
 import { CursorDirection, IMeta, IResponse, SortOrder } from './response.types'
-
-enum UserRole {
-  SUPER_ADMIN,
-  ADMIN,
-  USER,
-}
-
-enum UserStatus {
-  PENDING,
-  ACTIVE,
-  INACTIVE,
-  SUSPENDED,
-  BANNED,
-  DELETED,
-}
-
-enum Gender {
-  MALE,
-  FEMALE,
-  OTHER,
-  PREFER_NOT_TO_SAY,
-}
 
 interface IAvatar {
   createdAt: Date
@@ -145,7 +124,6 @@ type TChangePasswordInput = {
 
 type TChangePasswordForm = z.infer<typeof changePasswordSchema>
 
-export { Gender, UserRole, UserStatus }
 export type {
   IAvatar,
   IUser,

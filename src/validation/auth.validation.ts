@@ -127,6 +127,7 @@ const profileFormSchema = z.object({
 })
 
 export {
+  emailSchema,
   forgotPasswordSchema,
   genderEnum,
   loginFormSchema,

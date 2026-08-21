@@ -1,5 +1,5 @@
 import 'jsonwebtoken'
-import { UserRole } from './user.types'
+import { UserRole } from './enum.types'
 
 declare module 'jsonwebtoken' {
   export interface JwtPayload {
