@@ -15,6 +15,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Keep changes aligned with the App Router structure and route-group layouts under src/app/.
 - If a task touches auth, data fetching, or forms, inspect src/app/actions/, src/lib/, src/validation/, and src/components/modules/ first.
 
+## Environment
+
+- Copy `.env.example` to `.env` and set `NEXT_PUBLIC_API_URL` (default `http://localhost:5000`) and `NEXT_PUBLIC_SITE_URL` (default `http://localhost:3000`).
+- `$fetch` talks to `${NEXT_PUBLIC_API_URL}/api/v1` directly; the `/server/:path*` rewrite in `next.config.ts` also maps to it.
+- `.env` is gitignored — never commit secrets. `.env.example` is the source of truth for required vars.
+
 ## Commands
 
 - `pnpm dev` / `pnpm build` / `pnpm start` — dev server and production build
@@ -38,10 +44,10 @@ No test runner is installed — do not assume a test command exists.
 
 ## Architecture notes
 
-- Route groups: `(public)/` for public pages, `(auth)/` for login/signup, `(dashboard)/` for authenticated pages with sidebar.
+- Route groups: `(public)/` home, `(auth)/` login/signup/forgot-password/reset-password/verify-email, `(dashboard)/` dashboard/profile/settings/users/change-password with sidebar. No `src/app/api/` routes exist — all data goes to the backend via `$fetch`.
 - Server Actions live in `src/app/actions/` — default place for auth mutations and backend calls from forms.
 - Client-side data fetching goes through the shared fetch layer in `src/lib/`.
-- `src/proxy.ts` is a placeholder middleware (matcher: `/api/auth/*`); currently redirects to `/home`.
+- `src/proxy.ts` is a real auth guard, not a placeholder: redirects logged-out users from `/dashboard`, `/profile`, `/settings`, `/users` to `/login`, and logged-in users away from `(auth)/` routes to `/dashboard`. Matcher excludes `api`, `_next`, static assets.
 
 ## Data layer and API conventions
 
@@ -49,8 +55,9 @@ No test runner is installed — do not assume a test command exists.
 - Auto-refresh on 401 is built into `$fetch` (via `onError` handler); do not duplicate.
 - Rewrite in `next.config.ts` maps `/server/:path*` → `${NEXT_PUBLIC_API_URL}/api/v1/:path*`.
 - Cookie propagation and Set-Cookie forwarding handled in `$fetch`; do not reimplement.
-- Server Actions use `$fetch.post<T>()` patterns (not raw `fetch`) and call `revalidateTag` with cache tags from `src/constant/tags.ts`.
+- Server Actions use `$fetch.post<T>()` patterns (not raw `fetch`) and call `revalidateTag(CACHE_TAGS.PROFILE, 'max')` with tags from `src/constant/tags.ts`.
 - Client async state: prefer `useFetch` hook from `src/lib/fetch/use-fetch.ts` over custom loading/error logic.
+- Server Action error handling: `handleFetchError` from `src/lib/error.ts` normalizes failures to `T | IErrorResponse`;
 
 ## Forms, validation, and types
 

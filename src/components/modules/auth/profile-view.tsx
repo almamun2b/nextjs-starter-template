@@ -1,6 +1,5 @@
 'use client'
 
-import { useAuth } from '@/providers/auth-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,7 +11,9 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Gender, type IUser } from '@/types/user.types'
+import { useAuth } from '@/providers/auth-provider'
+import { Gender } from '@/types/enum.types'
+import type { IUser } from '@/types/user.types'
 import { PencilIcon } from 'lucide-react'
 import Link from 'next/link'
 

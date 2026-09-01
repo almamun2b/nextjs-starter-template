@@ -1,5 +1,6 @@
 'use server'
 
+import { CACHE_TAGS } from '@/constant/tags'
 import { $fetch } from '@/lib/$fetch'
 import { handleFetchError } from '@/lib/error'
 import { IErrorResponse, IResponse } from '@/types/response.types'
@@ -16,6 +17,7 @@ import type {
   TUsersResponse,
   UpdateAvatarInput,
 } from '@/types/user.types'
+import { revalidateTag } from 'next/cache'
 
 // super and admin only
 const getAllUsers = async (
@@ -27,6 +29,7 @@ const getAllUsers = async (
       TUserQueryOptions
     >('/users', {
       params,
+      next: { tags: [CACHE_TAGS.USERS] },
     })
     return response
   } catch (error) {
@@ -43,6 +46,7 @@ const createUserManually = async (
       TUserResponse,
       TCreateUserInput
     >('/users', { body: data })
+    revalidateTag(CACHE_TAGS.USERS, 'max')
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -52,7 +56,9 @@ const createUserManually = async (
 // super, admin and user only
 const me = async (): Promise<TUserResponse> => {
   try {
-    const { data: response } = await $fetch.get<TUserResponse>('/users/me')
+    const { data: response } = await $fetch.get<TUserResponse>('/users/me', {
+      next: { tags: [CACHE_TAGS.PROFILE] },
+    })
     return response
   } catch (error) {
     throw error
@@ -68,6 +74,8 @@ const updateMyProfile = async (
       TUserResponse,
       TUpdateProfileInput
     >('/users/me', { body: data })
+    revalidateTag(CACHE_TAGS.PROFILE, 'max')
+    revalidateTag(CACHE_TAGS.USERS, 'max')
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -93,6 +101,8 @@ const updateMyProfileWihAvatar = async (
       '/users/me/profile',
       { body: formData }
     )
+    revalidateTag(CACHE_TAGS.PROFILE, 'max')
+    revalidateTag(CACHE_TAGS.USERS, 'max')
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -110,6 +120,8 @@ const updateMyAvatarOnly = async (
       '/users/me/avatar',
       { body: formData }
     )
+    revalidateTag(CACHE_TAGS.PROFILE, 'max')
+    revalidateTag(CACHE_TAGS.USERS, 'max')
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -121,6 +133,8 @@ const deleteMyAvatar = async (): Promise<TUserResponse> => {
   try {
     const { data: response } =
       await $fetch.delete<TUserResponse>('/users/me/avatar')
+    revalidateTag(CACHE_TAGS.PROFILE, 'max')
+    revalidateTag(CACHE_TAGS.USERS, 'max')
     return response
   } catch (error) {
     throw error
@@ -149,6 +163,8 @@ const deactivateMyAccount = async (): Promise<TUserResponse> => {
       TUserResponse,
       TUpdateStatusInput
     >('/users/me/deactivate')
+    revalidateTag(CACHE_TAGS.PROFILE, 'max')
+    revalidateTag(CACHE_TAGS.USERS, 'max')
     return response
   } catch (error) {
     throw error
@@ -162,6 +178,8 @@ const reactivateMyAccount = async (): Promise<TUserResponse> => {
       TUserResponse,
       TUpdateStatusInput
     >('/users/me/reactivate')
+    revalidateTag(CACHE_TAGS.PROFILE, 'max')
+    revalidateTag(CACHE_TAGS.USERS, 'max')
     return response
   } catch (error) {
     throw error
@@ -171,10 +189,30 @@ const reactivateMyAccount = async (): Promise<TUserResponse> => {
 // super and admin only
 const getUserById = async (id: string): Promise<TUserResponse> => {
   try {
-    const { data: response } = await $fetch.get<TUserResponse>(`/users/${id}`)
+    const { data: response } = await $fetch.get<TUserResponse>(`/users/${id}`, {
+      next: { tags: [CACHE_TAGS.USERS, CACHE_TAGS.USER(id)] },
+    })
     return response
   } catch (error) {
     throw error
+  }
+}
+
+// super and admin only
+const updateUserById = async (
+  id: string,
+  data: TUpdateProfileInput
+): Promise<TUserResponse | IErrorResponse> => {
+  try {
+    const { data: response } = await $fetch.patch<
+      TUserResponse,
+      TUpdateProfileInput
+    >(`/users/${id}`, { body: data })
+    revalidateTag(CACHE_TAGS.USERS, 'max')
+    revalidateTag(CACHE_TAGS.USER(id), 'max')
+    return response
+  } catch (error) {
+    return handleFetchError(error)
   }
 }
 
@@ -188,6 +226,8 @@ const updateUserStatus = async (
       TUserResponse,
       TUpdateStatusInput
     >(`/users/${id}/status`, { body: data })
+    revalidateTag(CACHE_TAGS.USERS, 'max')
+    revalidateTag(CACHE_TAGS.USER(id), 'max')
     return response
   } catch (error) {
     throw error
@@ -204,6 +244,8 @@ const updateUserRole = async (
       TUserResponse,
       TUpdateRoleInput
     >(`/users/${id}/role`, { body: data })
+    revalidateTag(CACHE_TAGS.USERS, 'max')
+    revalidateTag(CACHE_TAGS.USER(id), 'max')
     return response
   } catch (error) {
     throw error
@@ -216,6 +258,8 @@ const deleteUserSoft = async (id: string): Promise<TUserResponse> => {
     const { data: response } = await $fetch.delete<TUserResponse>(
       `/users/${id}`
     )
+    revalidateTag(CACHE_TAGS.USERS, 'max')
+    revalidateTag(CACHE_TAGS.USER(id), 'max')
     return response
   } catch (error) {
     throw error
@@ -228,6 +272,8 @@ const deleteUserHard = async (id: string): Promise<TUserDeleteResponse> => {
     const { data: response } = await $fetch.delete<TUserDeleteResponse>(
       `/users/${id}/hard`
     )
+    revalidateTag(CACHE_TAGS.USERS, 'max')
+    revalidateTag(CACHE_TAGS.USER(id), 'max')
     return response
   } catch (error) {
     throw error
@@ -248,6 +294,7 @@ export {
   updateMyAvatarOnly,
   updateMyProfile,
   updateMyProfileWihAvatar,
+  updateUserById,
   updateUserRole,
   updateUserStatus,
 }
