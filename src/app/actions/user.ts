@@ -280,6 +280,17 @@ const deleteUserHard = async (id: string): Promise<TUserDeleteResponse> => {
   }
 }
 
+/**
+ * Busts the users cache tag so the next Server Component render refetches.
+ *
+ * `router.refresh()` alone re-runs the server render but can still be served
+ * the tag-cached `getAllUsers` response, which would make a manual refresh a
+ * no-op. This adds no backend endpoint — it only invalidates an existing tag.
+ */
+const revalidateUsers = async (): Promise<void> => {
+  revalidateTag(CACHE_TAGS.USERS, 'max')
+}
+
 export {
   changeMyPassword,
   createUserManually,
@@ -291,6 +302,7 @@ export {
   getUserById,
   me,
   reactivateMyAccount,
+  revalidateUsers,
   updateMyAvatarOnly,
   updateMyProfile,
   updateMyProfileWihAvatar,

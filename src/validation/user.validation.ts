@@ -1,4 +1,4 @@
-import { UserRole, UserStatus } from '@/types/enum.types'
+import { USER_ROLE_OPTIONS, USER_STATUS_OPTIONS } from '@/constant/user'
 import {
   emailSchema,
   genderEnum,
@@ -18,6 +18,16 @@ const changePasswordSchema = z
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   })
+
+// The API exchanges roles/statuses as their string keys, so these validate the
+// string values from `USER_ROLE_OPTIONS`/`USER_STATUS_OPTIONS` rather than the
+// numeric `UserRole`/`UserStatus` enums those names are typed against.
+const roleEnum = z.enum(
+  USER_ROLE_OPTIONS.map((option) => option.value) as [string, ...string[]]
+)
+const statusEnum = z.enum(
+  USER_STATUS_OPTIONS.map((option) => option.value) as [string, ...string[]]
+)
 
 const createUserSchema = z
   .object({
@@ -52,12 +62,30 @@ const createUserSchema = z
       .optional()
       .or(z.literal('')),
     gender: z.union([z.literal(''), genderEnum]).optional(),
-    role: z.nativeEnum(UserRole).optional(),
-    status: z.nativeEnum(UserStatus).optional(),
+    role: z.union([z.literal(''), roleEnum]).optional(),
+    status: z.union([z.literal(''), statusEnum]).optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   })
 
-export { changePasswordSchema, createUserSchema }
+const updateUserRoleSchema = z.object({
+  role: roleEnum,
+})
+
+const updateUserStatusSchema = z.object({
+  status: statusEnum,
+})
+
+type TCreateUserForm = z.infer<typeof createUserSchema>
+type TUpdateUserRoleForm = z.infer<typeof updateUserRoleSchema>
+type TUpdateUserStatusForm = z.infer<typeof updateUserStatusSchema>
+
+export {
+  changePasswordSchema,
+  createUserSchema,
+  updateUserRoleSchema,
+  updateUserStatusSchema,
+}
+export type { TCreateUserForm, TUpdateUserRoleForm, TUpdateUserStatusForm }
