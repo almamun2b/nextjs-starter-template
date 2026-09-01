@@ -17,7 +17,7 @@ const ALL_VALUE = 'ALL'
 
 interface TableFilterProps extends Omit<
   React.ComponentProps<typeof SelectPrimitive.Root>,
-  'value' | 'onValueChange'
+  'value' | 'onValueChange' | 'className'
 > {
   /** Current filter value. `undefined` means "All" is selected. */
   value: string | undefined
@@ -37,6 +37,8 @@ interface TableFilterProps extends Omit<
   classNameSelectItem?: string
   /** Custom className for the SelectValue. */
   classNameSelectValue?: string
+  /** Custom className for the root Select. */
+  className?: string
   /** Optional label rendered at the top of the SelectContent. */
   label?: ReactNode
   /** Optional className for the label. */
