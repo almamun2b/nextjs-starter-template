@@ -25,6 +25,20 @@ const USER_VERIFIED_OPTIONS = [
   { value: 'false', label: 'Unverified' },
 ] as const
 
+const AVATAR_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const
+
+/** Value for the file input's `accept` attribute. */
+const AVATAR_ACCEPT_ATTRIBUTE = AVATAR_ACCEPTED_TYPES.join(',')
+
+/**
+ * Client-side cap, deliberately below `serverActions.bodySizeLimit` in
+ * next.config.ts so the friendly inline message fires before Next rejects the
+ * request body with an opaque error.
+ */
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
+const AVATAR_MAX_LABEL = '2 MB'
+
 /** Allowed `limit` values — also the rows-per-page dropdown. */
 const USER_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
 
@@ -41,6 +55,10 @@ const USER_SORTABLE_FIELDS = [
 ] as const
 
 export {
+  AVATAR_ACCEPT_ATTRIBUTE,
+  AVATAR_ACCEPTED_TYPES,
+  AVATAR_MAX_BYTES,
+  AVATAR_MAX_LABEL,
   USER_DEFAULT_PAGE_SIZE,
   USER_GENDER_OPTIONS,
   USER_PAGE_SIZE_OPTIONS,

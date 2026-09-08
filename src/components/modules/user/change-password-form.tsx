@@ -2,6 +2,7 @@
 
 import { changeMyPassword } from '@/app/actions/user'
 import { PasswordInput } from '@/components/modules/auth/password-input'
+import { PasswordStrengthMeter } from '@/components/modules/auth/password-strength-meter'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -11,22 +12,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
+import { FieldGroup } from '@/components/ui/field'
+import { Spinner } from '@/components/ui/spinner'
 import { isFormInputField } from '@/lib/form'
 import { TChangePasswordForm } from '@/types/user.types'
 import { changePasswordSchema } from '@/validation/user.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2Icon } from 'lucide-react'
 import { useTransition } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
+import { FormController } from '@/components/shared/FormController'
 
 type TChangePasswordFormProps = React.ComponentProps<'div'>
 
@@ -74,7 +69,7 @@ export function ChangePasswordForm({ ...props }: TChangePasswordFormProps) {
   return (
     <Card {...props}>
       <CardHeader>
-        <CardTitle>Change Password</CardTitle>
+        <CardTitle>Change password</CardTitle>
         <CardDescription>
           Update your account password. You&apos;ll need to enter your current
           password first.
@@ -83,121 +78,76 @@ export function ChangePasswordForm({ ...props }: TChangePasswordFormProps) {
       <CardContent>
         <form id="change-password-form" onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            <Controller
+            <FormController
               name="oldPassword"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                  className="grid grid-cols-1 md:grid-cols-2"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Current Password{' '}
-                      <span className="text-destructive">*</span>
-                    </FieldLabel>
-                  </FieldContent>
-                  <div className="flex flex-col gap-1">
-                    <PasswordInput
-                      {...field}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="********"
-                      autoComplete="on"
-                      className="h-9 max-w-md"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </div>
-                </Field>
+              label="Current password *"
+            >
+              {(field, fieldState) => (
+                <PasswordInput
+                  {...field}
+                  id="oldPassword"
+                  aria-invalid={fieldState.invalid}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className="max-w-md"
+                />
               )}
-            />
-            <Controller
+            </FormController>
+
+            <FormController
               name="newPassword"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                  className="grid grid-cols-1 md:grid-cols-2"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      New Password <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldDescription>
-                      Must be at least 8 characters with uppercase, lowercase,
-                      number, and special character
-                    </FieldDescription>
-                  </FieldContent>
-                  <div className="flex flex-col gap-1">
-                    <PasswordInput
-                      {...field}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="********"
-                      autoComplete="on"
-                      className="h-9 max-w-md"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </div>
-                </Field>
+              label="New password *"
+            >
+              {(field, fieldState) => (
+                <>
+                  <PasswordInput
+                    {...field}
+                    id="newPassword"
+                    aria-invalid={fieldState.invalid}
+                    aria-describedby="newPassword-requirements"
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className="max-w-md"
+                  />
+                  <PasswordStrengthMeter
+                    value={field.value}
+                    inputId="newPassword"
+                    className="max-w-md pt-1"
+                  />
+                </>
               )}
-            />
-            <Controller
+            </FormController>
+
+            <FormController
               name="confirmPassword"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                  className="grid grid-cols-1 md:grid-cols-2"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Confirm New Password{' '}
-                      <span className="text-destructive">*</span>
-                    </FieldLabel>
-                  </FieldContent>
-                  <div className="flex flex-col gap-1">
-                    <PasswordInput
-                      {...field}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="********"
-                      autoComplete="on"
-                      className="h-9 max-w-md"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </div>
-                </Field>
+              label="Confirm new password *"
+            >
+              {(field, fieldState) => (
+                <PasswordInput
+                  {...field}
+                  id="confirmPassword"
+                  aria-invalid={fieldState.invalid}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  className="max-w-md"
+                />
               )}
-            />
+            </FormController>
           </FieldGroup>
         </form>
       </CardContent>
-      <CardFooter className="flex items-center justify-end gap-2 border-t px-6 py-4">
+      <CardFooter className="justify-end gap-2">
         <Button
           type="submit"
           size="sm"
           form="change-password-form"
           disabled={!isValid || isPending}
-          className="h-9"
         >
-          {isPending ? (
-            <>
-              Changing...
-              <Loader2Icon className="ml-1.5 size-3.5 animate-spin" />
-            </>
-          ) : (
-            'Change Password'
-          )}
+          {isPending && <Spinner className="size-3.5" />}
+          {isPending ? 'Changing...' : 'Change password'}
         </Button>
       </CardFooter>
     </Card>

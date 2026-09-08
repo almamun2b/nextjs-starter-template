@@ -14,22 +14,78 @@ const emailSchema = z
   .trim()
   .toLowerCase()
 
+const PASSWORD_MIN_LENGTH = 8
+const PASSWORD_MAX_LENGTH = 128
+
+type TPasswordRuleId =
+  | 'length'
+  | 'uppercase'
+  | 'lowercase'
+  | 'number'
+  | 'special'
+
+interface IPasswordRule {
+  id: TPasswordRuleId
+  /** Short imperative text for the strength checklist. */
+  label: string
+  /** Sentence shown as the validation error. */
+  message: string
+  test: (value: string) => boolean
+}
+
+/**
+ * Single source of truth for password policy.
+ *
+ * `passwordSchema` below is built from this, and the strength meter renders
+ * from it — so the rules, their error messages and the checklist can't drift.
+ */
+const PASSWORD_RULES: readonly IPasswordRule[] = [
+  {
+    id: 'length',
+    label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+    message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+    test: (value) => value.length >= PASSWORD_MIN_LENGTH,
+  },
+  {
+    id: 'uppercase',
+    label: 'One uppercase letter',
+    message: 'Password must contain at least one uppercase letter',
+    test: (value) => /[A-Z]/.test(value),
+  },
+  {
+    id: 'lowercase',
+    label: 'One lowercase letter',
+    message: 'Password must contain at least one lowercase letter',
+    test: (value) => /[a-z]/.test(value),
+  },
+  {
+    id: 'number',
+    label: 'One number',
+    message: 'Password must contain at least one number',
+    test: (value) => /[0-9]/.test(value),
+  },
+  {
+    id: 'special',
+    label: 'One special character',
+    message: 'Password must contain at least one special character',
+    test: (value) => /[^A-Za-z0-9]/.test(value),
+  },
+] as const
+
+// `superRefine` (rather than chained `.refine`s) keeps zod reporting *every*
+// unmet rule at once, which is what drives FieldError's multi-error list.
 const passwordSchema = z
   .string()
   .min(1, { message: 'Password is required' })
-  .min(8, { message: 'Password must be at least 8 characters' })
-  .max(128, {
-    message: 'Password must not exceed 128 characters',
+  .max(PASSWORD_MAX_LENGTH, {
+    message: `Password must not exceed ${PASSWORD_MAX_LENGTH} characters`,
   })
-  .regex(/[A-Z]/, {
-    message: 'Password must contain at least one uppercase letter',
-  })
-  .regex(/[a-z]/, {
-    message: 'Password must contain at least one lowercase letter',
-  })
-  .regex(/[0-9]/, { message: 'Password must contain at least one number' })
-  .regex(/[^A-Za-z0-9]/, {
-    message: 'Password must contain at least one special character',
+  .superRefine((value, ctx) => {
+    for (const rule of PASSWORD_RULES) {
+      if (!rule.test(value)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: rule.message })
+      }
+    }
   })
 
 const loginFormSchema = z.object({
@@ -131,9 +187,13 @@ export {
   forgotPasswordSchema,
   genderEnum,
   loginFormSchema,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES,
   passwordSchema,
   profileFormSchema,
   registerFormSchema,
   resetPasswordSchema,
   verifyEmailSchema,
 }
+export type { IPasswordRule, TPasswordRuleId }

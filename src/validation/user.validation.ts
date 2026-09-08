@@ -8,7 +8,10 @@ import z from 'zod/v3'
 
 const changePasswordSchema = z
   .object({
-    oldPassword: passwordSchema,
+    // Deliberately NOT `passwordSchema` — that enforces the *current* policy,
+    // but a user's existing password may predate it. Requiring it here would
+    // permanently lock such a user out of ever changing their password.
+    oldPassword: z.string().min(1, { message: 'Current password is required' }),
     newPassword: passwordSchema,
     confirmPassword: z
       .string()
@@ -17,6 +20,10 @@ const changePasswordSchema = z
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: 'Passwords do not match',
     path: ['confirmPassword'],
+  })
+  .refine((data) => data.newPassword !== data.oldPassword, {
+    message: 'New password must be different from your current password',
+    path: ['newPassword'],
   })
 
 // The API exchanges roles/statuses as their string keys, so these validate the

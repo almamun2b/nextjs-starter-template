@@ -9,7 +9,13 @@ const publicRoutes = new Set([
   '/verify-email',
 ])
 
-const authRoutes = new Set(['/dashboard', '/profile', '/settings', '/users'])
+const authRoutes = new Set([
+  '/dashboard',
+  '/profile',
+  '/settings',
+  '/users',
+  '/change-password',
+])
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl

@@ -1,6 +1,7 @@
 'use client'
 
 import { updateMyProfile } from '@/app/actions/user'
+import { FormController } from '@/components/shared/FormController'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,13 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Field,
-  FieldContent,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
+import { FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -27,42 +22,29 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Spinner } from '@/components/ui/spinner'
+import { Textarea } from '@/components/ui/textarea'
+import { USER_GENDER_OPTIONS } from '@/constant/user'
+import { date } from '@/lib/date'
 import { isFormInputField } from '@/lib/form'
+import {
+  getUserDisplayName,
+  getUserInitials,
+  readUserGender,
+} from '@/lib/user-format'
 import { useAuth } from '@/providers/auth-provider'
-import { Gender } from '@/types/enum.types'
-import type { IUser, TUpdateProfileInput } from '@/types/user.types'
+import type { TUpdateProfileInput } from '@/types/user.types'
 import { profileFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeftIcon, Loader2Icon } from 'lucide-react'
+import { ArrowLeftIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import z from 'zod/v3'
 
 type FormData = z.infer<typeof profileFormSchema>
-
-const GENDER_OPTIONS = [
-  { value: 'MALE', label: 'Male' },
-  { value: 'FEMALE', label: 'Female' },
-  { value: 'OTHER', label: 'Other' },
-  { value: 'PREFER_NOT_TO_SAY', label: 'Prefer not to say' },
-] as const
-
-function getInitials(user: IUser): string {
-  if (user.firstName && user.lastName) {
-    return (user.firstName[0] + user.lastName[0]).toUpperCase()
-  }
-  return user.email[0].toUpperCase()
-}
-
-function toDateInputValue(value: string | Date | null): string {
-  if (!value) return ''
-  const date = typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().split('T')[0]
-}
 
 export function ProfileEditForm() {
   const { user } = useAuth()
@@ -76,14 +58,11 @@ export function ProfileEditForm() {
       lastName: user?.lastName ?? '',
       phone: user?.phone ?? '',
       bio: user?.bio ?? '',
-      gender:
-        user?.gender !== null && user?.gender !== undefined
-          ? ((typeof user?.gender === 'number'
-              ? Gender[user.gender]
-              : user.gender) as FormData['gender'])
-          : '',
+      gender: (user
+        ? (readUserGender(user.gender) ?? '')
+        : '') as FormData['gender'],
       address: user?.address ?? '',
-      dateOfBirth: toDateInputValue(user?.dateOfBirth ?? null),
+      dateOfBirth: date.toDateInputValue(user?.dateOfBirth ?? null),
       timezone: user?.timezone ?? '',
       locale: user?.locale ?? '',
     },
@@ -134,281 +113,181 @@ export function ProfileEditForm() {
     })
   }
 
-  const initials = getInitials(user)
+  const displayName = getUserDisplayName(user)
+  const initials = getUserInitials(user)
   const avatarUrl = user.avatar?.url ?? null
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-14 rounded-full ring-2 ring-border">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={initials} />}
-                <AvatarFallback className="rounded-full text-base font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <CardTitle>Edit Profile</CardTitle>
-                <CardDescription>
-                  Update your personal information below
-                </CardDescription>
-              </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Avatar className="size-14">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+              <AvatarFallback className="text-base font-semibold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <CardTitle>Edit profile</CardTitle>
+              <CardDescription>
+                Update {displayName}&apos;s personal information below
+              </CardDescription>
             </div>
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/profile">
-                <ArrowLeftIcon className="size-4" />
-              </Link>
-            </Button>
           </div>
-        </CardHeader>
-
-        <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <FieldGroup>
-              <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                Personal Information
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Controller
-                  name="firstName"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldContent>
-                        <FieldLabel htmlFor={field.name}>First name</FieldLabel>
-                      </FieldContent>
-                      <Input
-                        {...field}
-                        id={field.name}
-                        placeholder="John"
-                        className="h-9"
-                      />
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="lastName"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldContent>
-                        <FieldLabel htmlFor={field.name}>Last name</FieldLabel>
-                      </FieldContent>
-                      <Input
-                        {...field}
-                        id={field.name}
-                        placeholder="Doe"
-                        className="h-9"
-                      />
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Controller
-                  name="gender"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldContent>
-                        <FieldLabel htmlFor={field.name}>Gender</FieldLabel>
-                      </FieldContent>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger id={field.name} className="h-9">
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GENDER_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="dateOfBirth"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldContent>
-                        <FieldLabel htmlFor={field.name}>
-                          Date of birth
-                        </FieldLabel>
-                      </FieldContent>
-                      <Input
-                        {...field}
-                        id={field.name}
-                        type="date"
-                        className="h-9"
-                      />
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
-                />
-              </div>
-
-              <Separator className="my-2" />
-
-              <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                Contact
-              </div>
-              <Controller
-                name="phone"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldContent>
-                      <FieldLabel htmlFor={field.name}>Phone</FieldLabel>
-                    </FieldContent>
-                    <Input
-                      {...field}
-                      id={field.name}
-                      placeholder="+1234567890"
-                      className="h-9"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="address"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldContent>
-                      <FieldLabel htmlFor={field.name}>Address</FieldLabel>
-                    </FieldContent>
-                    <textarea
-                      {...field}
-                      id={field.name}
-                      placeholder="Your address"
-                      rows={2}
-                      className="rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
-              <Separator className="my-2" />
-
-              <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                About
-              </div>
-              <Controller
-                name="bio"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldContent>
-                      <FieldLabel htmlFor={field.name}>Bio</FieldLabel>
-                    </FieldContent>
-                    <textarea
-                      {...field}
-                      id={field.name}
-                      placeholder="Tell us about yourself"
-                      rows={3}
-                      className="rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
-              <Separator className="my-2" />
-
-              <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                Localization
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Controller
-                  name="timezone"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldContent>
-                        <FieldLabel htmlFor={field.name}>Timezone</FieldLabel>
-                      </FieldContent>
-                      <Input
-                        {...field}
-                        id={field.name}
-                        placeholder="America/New_York"
-                        className="h-9"
-                      />
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
-                />
-                <Controller
-                  name="locale"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldContent>
-                        <FieldLabel htmlFor={field.name}>Locale</FieldLabel>
-                      </FieldContent>
-                      <Input
-                        {...field}
-                        id={field.name}
-                        placeholder="en-US"
-                        className="h-9"
-                      />
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
-                />
-              </div>
-            </FieldGroup>
-          </form>
-        </CardContent>
-
-        <CardFooter className="flex items-center justify-end gap-2 border-t px-6 py-4">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/profile">Cancel</Link>
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/profile" aria-label="Back to profile">
+              <ArrowLeftIcon className="size-4" />
+            </Link>
           </Button>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={isPending}
-            onClick={form.handleSubmit(onSubmit)}
-          >
-            {isPending && (
-              <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
-            )}
-            {isPending ? 'Saving...' : 'Save changes'}
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        <form id="profile-edit-form" onSubmit={form.handleSubmit(onSubmit)}>
+          <FieldGroup>
+            <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Personal Information
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormController
+                name="firstName"
+                control={form.control}
+                label="First name"
+              >
+                {(field) => (
+                  <Input {...field} id="firstName" placeholder="John" />
+                )}
+              </FormController>
+              <FormController
+                name="lastName"
+                control={form.control}
+                label="Last name"
+              >
+                {(field) => (
+                  <Input {...field} id="lastName" placeholder="Doe" />
+                )}
+              </FormController>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormController
+                name="gender"
+                control={form.control}
+                label="Gender"
+              >
+                {(field) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="gender" className="w-full">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {USER_GENDER_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </FormController>
+              <FormController
+                name="dateOfBirth"
+                control={form.control}
+                label="Date of birth"
+              >
+                {(field) => <Input {...field} id="dateOfBirth" type="date" />}
+              </FormController>
+            </div>
+
+            <Separator className="my-2" />
+
+            <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Contact
+            </div>
+            <FormController name="phone" control={form.control} label="Phone">
+              {(field) => (
+                <Input {...field} id="phone" placeholder="+1234567890" />
+              )}
+            </FormController>
+            <FormController
+              name="address"
+              control={form.control}
+              label="Address"
+            >
+              {(field) => (
+                <Textarea
+                  {...field}
+                  id="address"
+                  placeholder="Your address"
+                  rows={2}
+                />
+              )}
+            </FormController>
+
+            <Separator className="my-2" />
+
+            <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              About
+            </div>
+            <FormController name="bio" control={form.control} label="Bio">
+              {(field) => (
+                <Textarea
+                  {...field}
+                  id="bio"
+                  placeholder="Tell us about yourself"
+                  rows={3}
+                />
+              )}
+            </FormController>
+
+            <Separator className="my-2" />
+
+            <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Localization
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormController
+                name="timezone"
+                control={form.control}
+                label="Timezone"
+              >
+                {(field) => (
+                  <Input
+                    {...field}
+                    id="timezone"
+                    placeholder="America/New_York"
+                  />
+                )}
+              </FormController>
+              <FormController
+                name="locale"
+                control={form.control}
+                label="Locale"
+              >
+                {(field) => (
+                  <Input {...field} id="locale" placeholder="en-US" />
+                )}
+              </FormController>
+            </div>
+          </FieldGroup>
+        </form>
+      </CardContent>
+
+      <CardFooter className="justify-end gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/profile">Cancel</Link>
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          form="profile-edit-form"
+          disabled={isPending}
+        >
+          {isPending && <Spinner className="size-3.5" />}
+          {isPending ? 'Saving...' : 'Save changes'}
+        </Button>
+      </CardFooter>
+    </Card>
   )
 }

@@ -44,6 +44,8 @@ No test runner is installed — do not assume a test command exists.
 
 ## Architecture notes
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture — auth/cookie/refresh flow, component layering (`ui/` vs `shared/` vs `modules/` vs route-scoped `_components`/`_lib`), Server Action + cache-tag conventions, and a worked example (the Users feature). The points below are the quick-reference summary.
+
 - Route groups: `(public)/` home, `(auth)/` login/signup/forgot-password/reset-password/verify-email, `(dashboard)/` dashboard/profile/settings/users/change-password with sidebar. No `src/app/api/` routes exist — all data goes to the backend via `$fetch`.
 - Server Actions live in `src/app/actions/` — default place for auth mutations and backend calls from forms.
 - Client-side data fetching goes through the shared fetch layer in `src/lib/`.
@@ -81,6 +83,15 @@ No test runner is installed — do not assume a test command exists.
 - Path alias `@/*` maps to `src/*`.
 - Use `cn()` from `src/lib/utils.ts` for className composition.
 - Keep Tailwind classes organized; no ad hoc styling.
+
+## File and function size
+
+Guidelines for new or heavily-edited code, not a retroactive requirement — several existing feature components predate this and are not being mass-refactored to comply:
+
+- Components/modules: soft cap **150 lines** per file. Past that, split by responsibility (e.g. extract a dialog, a sub-list, or a `_lib` helper) rather than growing one file — this repo's convention is already one dialog/view per file (see `users/_components/dialogs/`).
+- Functions: soft cap **100 lines**. If a function needs more, it's usually doing more than one job — extract the validation, mapping, or side-effect step into its own named function.
+- `src/components/ui/` (shadcn/ui primitives) is vendor code and exempt from both limits — don't split or trim it to hit a target.
+- These are advisory (not enforced by `pnpm lint`); if you want them enforced, ESLint's `max-lines` / `max-lines-per-function` rules are the natural fit, but turning them on will immediately flag existing files — treat that as a separate, deliberate decision, not a side effect of a docs change.
 
 ## Pre-commit flow
 

@@ -20,7 +20,7 @@ import {
   getStatusBadgeVariant,
   getStatusLabel,
 } from '../../_lib/user-enum'
-import { getUserDisplayName, getUserInitials } from '../../_lib/user-display'
+import { getUserDisplayName, getUserInitials } from '@/lib/user-format'
 
 interface UserViewDialogProps {
   user: IUser

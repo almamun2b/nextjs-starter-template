@@ -1,6 +1,7 @@
 'use client'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ProfileAvatarUploader } from '@/components/modules/user/profile-avatar-uploader'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -11,46 +12,17 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { date } from '@/lib/date'
+import {
+  getGenderLabel,
+  getRoleBadgeVariant,
+  getRoleLabel,
+  getStatusBadgeVariant,
+  getStatusLabel,
+} from '@/lib/user-format'
 import { useAuth } from '@/providers/auth-provider'
-import { Gender } from '@/types/enum.types'
-import type { IUser } from '@/types/user.types'
-import { PencilIcon } from 'lucide-react'
+import { CheckCircle2Icon, MinusCircleIcon, PencilIcon } from 'lucide-react'
 import Link from 'next/link'
-
-const GENDER_OPTIONS = [
-  { value: 'MALE', label: 'Male' },
-  { value: 'FEMALE', label: 'Female' },
-  { value: 'OTHER', label: 'Other' },
-  { value: 'PREFER_NOT_TO_SAY', label: 'Prefer not to say' },
-] as const
-
-const GENDER_LABELS = Object.fromEntries(
-  GENDER_OPTIONS.map((o) => [o.value, o.label])
-)
-
-function getInitials(user: IUser): string {
-  if (user.firstName && user.lastName) {
-    return (user.firstName[0] + user.lastName[0]).toUpperCase()
-  }
-  return user.email[0].toUpperCase()
-}
-
-function toDateValue(value: string | Date | null): Date | null {
-  if (!value) return null
-  const date = typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(date.getTime())) return null
-  return date
-}
-
-function formatDate(value: string | Date | null): string {
-  const date = toDateValue(value)
-  if (!date) return ''
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
 
 function FieldRow({ label, value }: { label: string; value: string }) {
   return (
@@ -74,101 +46,107 @@ export function ProfileView() {
     )
   }
 
-  const initials = getInitials(user)
-  const avatarUrl = user.avatar?.url ?? null
-
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-14 rounded-full ring-2 ring-border">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={initials} />}
-                <AvatarFallback className="rounded-full text-base font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>Your personal information</CardDescription>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/profile/edit">
-                <PencilIcon className="mr-1 size-3.5" />
-                Edit
-              </Link>
-            </Button>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <ProfileAvatarUploader user={user} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={getRoleBadgeVariant(user.role)}>
+              {getRoleLabel(user.role)}
+            </Badge>
+            <Badge variant={getStatusBadgeVariant(user.status)}>
+              {getStatusLabel(user.status)}
+            </Badge>
+            {user.isVerified ? (
+              <span className="inline-flex items-center gap-1.5 text-sm text-foreground">
+                <CheckCircle2Icon className="size-3.5 text-primary" />
+                Verified
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <MinusCircleIcon className="size-3.5" />
+                Unverified
+              </span>
+            )}
           </div>
-        </CardHeader>
+        </div>
+        <div>
+          <CardTitle>Profile</CardTitle>
+          <CardDescription>Your personal information</CardDescription>
+        </div>
+      </CardHeader>
 
-        <CardContent>
-          <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Personal Information
-          </div>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FieldRow label="First name" value={user.firstName ?? '—'} />
-            <FieldRow label="Last name" value={user.lastName ?? '—'} />
-            <FieldRow label="Username" value={user.username ?? '—'} />
-            <FieldRow label="Email" value={user.email} />
-            <FieldRow
-              label="Gender"
-              value={
-                user.gender !== null && user.gender !== undefined
-                  ? (GENDER_LABELS[
-                      typeof user.gender === 'number'
-                        ? Gender[user.gender]
-                        : user.gender
-                    ] ?? '—')
-                  : '—'
-              }
-            />
-            <FieldRow
-              label="Date of birth"
-              value={formatDate(user.dateOfBirth) || '—'}
-            />
-          </dl>
+      <CardContent>
+        <div className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          Personal Information
+        </div>
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FieldRow label="First name" value={user.firstName ?? '—'} />
+          <FieldRow label="Last name" value={user.lastName ?? '—'} />
+          <FieldRow label="Username" value={user.username ?? '—'} />
+          <FieldRow label="Email" value={user.email} />
+          <FieldRow label="Gender" value={getGenderLabel(user.gender) ?? '—'} />
+          <FieldRow
+            label="Date of birth"
+            value={date.formatOrDash(user.dateOfBirth, 'MMMM d, yyyy')}
+          />
+        </dl>
 
-          <Separator className="my-5" />
+        <Separator className="my-5" />
 
-          <div className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Contact
-          </div>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FieldRow label="Phone" value={user.phone ?? '—'} />
-            <FieldRow label="Address" value={user.address ?? '—'} />
-          </dl>
+        <div className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          Contact
+        </div>
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FieldRow label="Phone" value={user.phone ?? '—'} />
+          <FieldRow label="Address" value={user.address ?? '—'} />
+        </dl>
 
-          <Separator className="my-5" />
+        <Separator className="my-5" />
 
-          <div className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            About
-          </div>
-          <dl className="grid grid-cols-1 gap-4">
-            <FieldRow label="Bio" value={user.bio ?? '—'} />
-          </dl>
+        <div className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          About
+        </div>
+        <dl className="grid grid-cols-1 gap-4">
+          <FieldRow label="Bio" value={user.bio ?? '—'} />
+        </dl>
 
-          <Separator className="my-5" />
+        <Separator className="my-5" />
 
-          <div className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Localization
-          </div>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FieldRow label="Timezone" value={user.timezone ?? '—'} />
-            <FieldRow label="Locale" value={user.locale ?? '—'} />
-          </dl>
-        </CardContent>
+        <div className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          Localization
+        </div>
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FieldRow label="Timezone" value={user.timezone ?? '—'} />
+          <FieldRow label="Locale" value={user.locale ?? '—'} />
+        </dl>
 
-        <CardFooter className="border-t px-6 py-4">
-          <Button variant="default" size="sm" asChild className="ml-auto">
-            <Link href="/profile/edit">
-              <PencilIcon className="mr-1 size-3.5" />
-              Edit profile
-            </Link>
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
+        <Separator className="my-5" />
+
+        <div className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          Account
+        </div>
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FieldRow
+            label="Member since"
+            value={date.formatOrDash(user.createdAt, 'MMMM d, yyyy')}
+          />
+          <FieldRow
+            label="Last login"
+            value={date.formatOrDash(user.lastLoginAt)}
+          />
+        </dl>
+      </CardContent>
+
+      <CardFooter className="justify-end">
+        <Button variant="default" size="sm" asChild>
+          <Link href="/profile/edit">
+            <PencilIcon className="size-3.5" />
+            Edit profile
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
   )
 }

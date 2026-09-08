@@ -7,7 +7,7 @@ import { date } from '@/lib/date'
 import { type IUser } from '@/types/user.types'
 import { CheckCircle2Icon, MinusCircleIcon } from 'lucide-react'
 import { type TUserDialogAction } from '../_lib/user-dialog'
-import { getUserDisplayName, getUserInitials } from '../_lib/user-display'
+import { getUserDisplayName, getUserInitials } from '@/lib/user-format'
 import {
   getRoleBadgeVariant,
   getRoleLabel,

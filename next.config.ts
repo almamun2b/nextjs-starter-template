@@ -3,6 +3,11 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  experimental: {
+    // Avatar uploads go through a Server Action; Next rejects request bodies
+    // over 1 MB by default, before the action body ever runs.
+    serverActions: { bodySizeLimit: '4mb' },
+  },
   async rewrites() {
     return [
       {

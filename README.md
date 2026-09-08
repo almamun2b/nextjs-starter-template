@@ -87,27 +87,29 @@ pnpm start
 
 ## 📚 Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server |
-| `pnpm build` | Build for production |
-| `pnpm start` | Start production server |
-| `pnpm lint` | Run ESLint |
-| `pnpm lint:fix` | Run ESLint with auto-fix |
-| `pnpm format` | Format code with Prettier |
-| `pnpm typecheck` | Check TypeScript types |
-| `pnpm prepare` | Setup Husky hooks |
+| Command          | Description               |
+| ---------------- | ------------------------- |
+| `pnpm dev`       | Start development server  |
+| `pnpm build`     | Build for production      |
+| `pnpm start`     | Start production server   |
+| `pnpm lint`      | Run ESLint                |
+| `pnpm lint:fix`  | Run ESLint with auto-fix  |
+| `pnpm format`    | Format code with Prettier |
+| `pnpm typecheck` | Check TypeScript types    |
+| `pnpm prepare`   | Setup Husky hooks         |
 
 > **Note:** Replace `pnpm` with `npm run`, `yarn`, or `bun` if you prefer a different package manager.
 
 ## 📦 Tech Stack
 
 ### Core Framework
+
 - **Next.js** (16.2.9) - React framework for production
 - **React** (19.2.4) - UI library
 - **React DOM** (19.2.4) - React rendering for web
 
 ### Styling & UI
+
 - **Tailwind CSS** (4) - Utility-first CSS framework
 - **Tailwind CSS PostCSS** (4) - PostCSS plugin for Tailwind
 - **shadcn/ui** (4.11.0) - High-quality React components
@@ -115,11 +117,13 @@ pnpm start
 - **next-themes** (0.4.6) - Theme management (dark mode)
 
 ### Forms & Validation
+
 - **React Hook Form** (7.80.0) - Performant form management
 - **@hookform/resolvers** (5.4.0) - Schema validation resolvers
 - **Zod** (4.4.3) - TypeScript-first schema validation
 
 ### Utilities
+
 - **date-fns** (4.4.0) - Modern date utility library
 - **clsx** (2.1.1) - Utility for constructing className strings
 - **tailwind-merge** (3.6.0) - Merge Tailwind classes
@@ -130,6 +134,7 @@ pnpm start
 - **radix-ui** (1.6.0) - Headless UI primitives
 
 ### Development Tools
+
 - **TypeScript** (5) - Type-safe JavaScript
 - **ESLint** (9) - JavaScript linter
 - **Prettier** (3.8.3) - Code formatter
@@ -160,6 +165,10 @@ nextjs-starter-template/
 ├── eslint.config.js      # ESLint configuration
 └── README.md             # This file
 ```
+
+## 🏗️ Architecture
+
+For how the pieces fit together — auth/cookie/refresh flow, component layering, Server Action conventions, and a worked example feature — see [ARCHITECTURE.md](ARCHITECTURE.md). Agent-facing conventions (commands, code style, file/function size guidelines) live in [AGENTS.md](AGENTS.md).
 
 ## 🔄 Fetch Utility
 
@@ -281,6 +290,7 @@ pnpm typecheck   # Verify TypeScript types
 ### Husky & lint-staged
 
 Git hooks are automatically installed. Pre-commit hooks will:
+
 - Run ESLint on staged files
 - Format code with Prettier
 - Check TypeScript types
@@ -392,6 +402,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 👤 Author
 
 **Md Abdullah Al Mamun**
+
 - Email: [almamun2b@gmail.com](mailto:almamun2b@gmail.com)
 - Portfolio: [portfolio-mamun.vercel.app](https://portfolio-mamun.vercel.app)
 - GitHub: [@almamun2b](https://github.com/almamun2b)
@@ -417,6 +428,7 @@ If you have any questions or need help, please:
 ## 🎉 Acknowledgments
 
 This template is built with awesome open-source projects:
+
 - [Next.js](https://nextjs.org)
 - [React](https://react.dev)
 - [Tailwind CSS](https://tailwindcss.com)
