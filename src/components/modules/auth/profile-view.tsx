@@ -1,6 +1,7 @@
 'use client'
 
 import { ProfileAvatarUploader } from '@/components/modules/user/profile-avatar-uploader'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,7 +22,12 @@ import {
   getStatusLabel,
 } from '@/lib/user-format'
 import { useAuth } from '@/providers/auth-provider'
-import { CheckCircle2Icon, MinusCircleIcon, PencilIcon } from 'lucide-react'
+import {
+  CheckCircle2Icon,
+  MinusCircleIcon,
+  PencilIcon,
+  UserXIcon,
+} from 'lucide-react'
 import Link from 'next/link'
 
 function FieldRow({ label, value }: { label: string; value: string }) {
@@ -40,9 +46,12 @@ export function ProfileView() {
 
   if (!user) {
     return (
-      <div className="rounded-lg border border-destructive/50 p-6 text-center text-destructive">
-        Failed to load profile. Please try again later.
-      </div>
+      <EmptyState
+        icon={UserXIcon}
+        tone="destructive"
+        title="Failed to load profile"
+        description="Please try again later."
+      />
     )
   }
 

@@ -1,6 +1,8 @@
 'use client'
 
 import { registerUser } from '@/app/actions/auth'
+import { PasswordStrengthMeter } from '@/components/modules/auth/password-strength-meter'
+import { FormController } from '@/components/shared/FormController'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -9,14 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
+import { Field, FieldDescription, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/modules/auth/password-input'
 import { isFormInputField } from '@/lib/form'
@@ -26,7 +21,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 type TSignupFormProps = React.ComponentProps<'div'>
@@ -81,150 +76,122 @@ export function SignupForm({ ...props }: TSignupFormProps) {
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Controller
+              <FormController
                 name="firstName"
                 control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field
-                    data-invalid={fieldState.invalid}
-                    orientation="responsive"
-                  >
-                    <FieldContent className="flex flex-col gap-1">
-                      <FieldLabel htmlFor={field.name}>
-                        First Name <span className="text-destructive">*</span>
-                      </FieldLabel>
-                    </FieldContent>
-                    <Input
-                      {...field}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="John"
-                      autoComplete="on"
-                      className="h-9 max-w-md"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="lastName"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field
-                    data-invalid={fieldState.invalid}
-                    orientation="responsive"
-                  >
-                    <FieldContent className="flex flex-col gap-1">
-                      <FieldLabel htmlFor={field.name}>
-                        Last Name <span className="text-destructive">*</span>
-                      </FieldLabel>
-                    </FieldContent>
-                    <Input
-                      {...field}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="Doe"
-                      autoComplete="on"
-                      className="h-9 max-w-md"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-            </div>
-            <Controller
-              name="email"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Email <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldDescription>
-                      Enter your email address
-                    </FieldDescription>
-                  </FieldContent>
+                orientation="responsive"
+                label={
+                  <>
+                    First Name <span className="text-destructive">*</span>
+                  </>
+                }
+              >
+                {(field, fieldState) => (
                   <Input
                     {...field}
                     id={field.name}
                     aria-invalid={fieldState.invalid}
-                    placeholder="john@example.com"
+                    placeholder="John"
                     autoComplete="on"
                     className="h-9 max-w-md"
                   />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+                )}
+              </FormController>
+              <FormController
+                name="lastName"
+                control={form.control}
+                orientation="responsive"
+                label={
+                  <>
+                    Last Name <span className="text-destructive">*</span>
+                  </>
+                }
+              >
+                {(field, fieldState) => (
+                  <Input
+                    {...field}
+                    id={field.name}
+                    aria-invalid={fieldState.invalid}
+                    placeholder="Doe"
+                    autoComplete="on"
+                    className="h-9 max-w-md"
+                  />
+                )}
+              </FormController>
+            </div>
+            <FormController
+              name="email"
+              control={form.control}
+              orientation="responsive"
+              label={
+                <>
+                  Email <span className="text-destructive">*</span>
+                </>
+              }
+              description="Enter your email address"
+            >
+              {(field, fieldState) => (
+                <Input
+                  {...field}
+                  id={field.name}
+                  aria-invalid={fieldState.invalid}
+                  placeholder="john@example.com"
+                  autoComplete="on"
+                  className="h-9 max-w-md"
+                />
               )}
-            />
-            <Controller
+            </FormController>
+            <FormController
               name="password"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Password <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldDescription>
-                      Must be at least 8 characters with uppercase, lowercase,
-                      number, and special character
-                    </FieldDescription>
-                  </FieldContent>
+              orientation="responsive"
+              label={
+                <>
+                  Password <span className="text-destructive">*</span>
+                </>
+              }
+              description="Must be at least 8 characters with uppercase, lowercase, number, and special character"
+            >
+              {(field, fieldState) => (
+                <>
                   <PasswordInput
                     {...field}
                     id={field.name}
                     aria-invalid={fieldState.invalid}
+                    aria-describedby={`${field.name}-requirements`}
                     placeholder="********"
                     autoComplete="on"
                     className="h-9 max-w-md"
                   />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+                  <PasswordStrengthMeter
+                    value={field.value}
+                    inputId={field.name}
+                    className="max-w-md pt-1"
+                  />
+                </>
               )}
-            />
-            <Controller
+            </FormController>
+            <FormController
               name="confirmPassword"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Confirm password{' '}
-                      <span className="text-destructive">*</span>
-                    </FieldLabel>
-                  </FieldContent>
-                  <PasswordInput
-                    {...field}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="********"
-                    autoComplete="on"
-                    className="h-9 max-w-md"
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+              orientation="responsive"
+              label={
+                <>
+                  Confirm password <span className="text-destructive">*</span>
+                </>
+              }
+            >
+              {(field, fieldState) => (
+                <PasswordInput
+                  {...field}
+                  id={field.name}
+                  aria-invalid={fieldState.invalid}
+                  placeholder="********"
+                  autoComplete="on"
+                  className="h-9 max-w-md"
+                />
               )}
-            />
+            </FormController>
             <Field>
               <Button
                 type="submit"

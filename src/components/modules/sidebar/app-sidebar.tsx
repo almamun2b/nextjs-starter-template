@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { usePathname } from 'next/navigation'
 
 import { NavMain } from '@/components/modules/sidebar/nav-main'
 import { NavUser } from '@/components/modules/sidebar/nav-user'
@@ -15,49 +16,32 @@ import {
   GalleryVerticalEnd,
   KeyRound,
   Layout,
+  SettingsIcon,
   UserIcon,
   Users,
 } from 'lucide-react'
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar>
 
-const navMain = {
-  label: 'Dashboard',
-  items: [
-    {
-      title: 'Dashboard',
-      url: '/dashboard',
-      icon: Layout,
-      isActive: false,
-    },
-    {
-      title: 'Users',
-      url: '/users',
-      icon: Users,
-      isActive: false,
-    },
-  ],
-}
+const NAV_MAIN_ITEMS = [
+  { title: 'Dashboard', url: '/dashboard', icon: Layout },
+  { title: 'Users', url: '/users', icon: Users },
+]
 
-const navSecondary = {
-  label: 'Settings',
-  items: [
-    {
-      title: 'Profile',
-      url: '/profile',
-      icon: UserIcon,
-      isActive: false,
-    },
-    {
-      title: 'Change Password',
-      url: '/change-password',
-      icon: KeyRound,
-      isActive: false,
-    },
-  ],
-}
+const NAV_SECONDARY_ITEMS = [
+  { title: 'Profile', url: '/profile', icon: UserIcon },
+  { title: 'Settings', url: '/settings', icon: SettingsIcon },
+  { title: 'Change Password', url: '/change-password', icon: KeyRound },
+]
 
 export function AppSidebar(props: AppSidebarProps) {
+  const pathname = usePathname()
+  const withActiveState = (items: typeof NAV_MAIN_ITEMS) =>
+    items.map((item) => ({
+      ...item,
+      isActive: pathname === item.url || pathname.startsWith(`${item.url}/`),
+    }))
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="flex h-16 flex-row border-b">
@@ -71,8 +55,16 @@ export function AppSidebar(props: AppSidebarProps) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain group={navMain} />
-        <NavMain group={navSecondary} className="mt-auto" />
+        <NavMain
+          group={{ label: 'Dashboard', items: withActiveState(NAV_MAIN_ITEMS) }}
+        />
+        <NavMain
+          group={{
+            label: 'Settings',
+            items: withActiveState(NAV_SECONDARY_ITEMS),
+          }}
+          className="mt-auto"
+        />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

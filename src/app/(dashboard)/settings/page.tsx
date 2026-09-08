@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/shared/empty-state'
 import { SettingsIcon } from 'lucide-react'
 import { type Metadata } from 'next'
 
@@ -16,19 +17,12 @@ const SettingsPage = () => {
         </p>
       </header>
 
-      <div className="flex w-full max-w-3xl flex-col items-center justify-center gap-3 rounded-xl border bg-card px-6 py-20 text-center">
-        <div className="flex size-11 items-center justify-center rounded-full bg-muted">
-          <SettingsIcon className="size-5 text-muted-foreground" />
-        </div>
-        <div className="space-y-1">
-          <p className="font-medium text-foreground">
-            Nothing to configure yet
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Workspace settings will appear here once available.
-          </p>
-        </div>
-      </div>
+      <EmptyState
+        icon={SettingsIcon}
+        title="Nothing to configure yet"
+        description="Workspace settings will appear here once available."
+        className="max-w-3xl"
+      />
     </div>
   )
 }

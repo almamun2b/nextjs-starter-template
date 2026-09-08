@@ -9,8 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { useResendCooldown } from '@/lib/use-resend-cooldown'
 import { Mail } from 'lucide-react'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
+import { useTransition } from 'react'
 import { toast } from 'sonner'
 
 type TForgotPasswordEmailSendProps = React.ComponentProps<'div'> & {
@@ -22,29 +24,7 @@ export function ForgotPasswordEmailSend({
   ...props
 }: TForgotPasswordEmailSendProps) {
   const [isPending, startTransition] = useTransition()
-  const [cooldown, setCooldown] = useState(120)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const clearTimer = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-  }
-
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setCooldown((prev) => {
-        if (prev <= 1) {
-          clearTimer()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return clearTimer
-  }, [])
+  const { cooldown, restart } = useResendCooldown()
 
   const handleResend = () => {
     if (cooldown > 0 || isPending) return
@@ -54,17 +34,7 @@ export function ForgotPasswordEmailSend({
 
       if (result.success) {
         toast.success(result.message)
-        clearTimer()
-        setCooldown(120)
-        intervalRef.current = setInterval(() => {
-          setCooldown((prev) => {
-            if (prev <= 1) {
-              clearTimer()
-              return 0
-            }
-            return prev - 1
-          })
-        }, 1000)
+        restart()
         return
       }
 
@@ -100,6 +70,11 @@ export function ForgotPasswordEmailSend({
             {cooldown > 0 ? `Resend email in ${cooldown}s` : 'Resend email'}
           </Button>
         </div>
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          <Link href="/login" className="underline-offset-4 hover:underline">
+            Back to login
+          </Link>
+        </p>
       </CardContent>
     </Card>
   )

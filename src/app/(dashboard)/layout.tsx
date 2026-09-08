@@ -1,5 +1,6 @@
 import { AppBreadcrumb } from '@/components/modules/sidebar/app-breadcrumb'
 import { AppSidebar } from '@/components/modules/sidebar/app-sidebar'
+import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { Separator } from '@/components/ui/separator'
 import {
   SidebarInset,
@@ -18,7 +19,7 @@ export default async function DashboardLayout({
       {/* `min-w-0` stops wide content (e.g. data tables) from widening the
           whole page instead of scrolling inside its own container. */}
       <SidebarInset className="min-w-0">
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-16">
+        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-16">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -26,6 +27,9 @@ export default async function DashboardLayout({
               className="mr-2 data-vertical:h-4 data-vertical:self-auto"
             />
             <AppBreadcrumb />
+          </div>
+          <div className="px-4">
+            <ThemeToggle />
           </div>
         </header>
         <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">{children}</div>

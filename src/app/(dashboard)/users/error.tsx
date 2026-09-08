@@ -1,5 +1,6 @@
 'use client'
 
+import { EmptyState } from '@/components/shared/empty-state'
 import { Button } from '@/components/ui/button'
 import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react'
 import { useEffect } from 'react'
@@ -19,26 +20,28 @@ const UsersError = ({ error, reset }: UsersErrorProps) => {
   }, [error])
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border bg-card px-6 py-20 text-center">
-      <div className="flex size-11 items-center justify-center rounded-full bg-destructive/10">
-        <AlertTriangleIcon className="size-5 text-destructive" />
-      </div>
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">Something went wrong</h2>
-        <p className="max-w-md text-sm text-muted-foreground">
+    <EmptyState
+      icon={AlertTriangleIcon}
+      tone="destructive"
+      headingTitle
+      title="Something went wrong"
+      description={
+        <>
           {error.message || 'The users page could not be loaded.'}
-        </p>
-        {error.digest && (
-          <p className="text-xs text-muted-foreground">
-            Error ID: <span className="font-mono">{error.digest}</span>
-          </p>
-        )}
-      </div>
-      <Button variant="outline" size="sm" onClick={reset}>
-        <RefreshCwIcon className="size-3.5" />
-        Try again
-      </Button>
-    </div>
+          {error.digest && (
+            <span className="mt-1 block font-mono text-xs">
+              Error ID: {error.digest}
+            </span>
+          )}
+        </>
+      }
+      action={
+        <Button variant="outline" size="sm" onClick={reset}>
+          <RefreshCwIcon className="size-3.5" />
+          Try again
+        </Button>
+      }
+    />
   )
 }
 

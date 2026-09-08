@@ -1,6 +1,7 @@
 'use client'
 
 import { resendVerificationCode, verifyEmail } from '@/app/actions/auth'
+import { FormController } from '@/components/shared/FormController'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -9,25 +10,20 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
+import { Field, FieldDescription, FieldGroup } from '@/components/ui/field'
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from '@/components/ui/input-otp'
 import { isFormInputField } from '@/lib/form'
+import { useResendCooldown } from '@/lib/use-resend-cooldown'
 import { verifyEmailSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, useTransition } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useTransition } from 'react'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import z from 'zod/v3'
 
@@ -40,37 +36,7 @@ type TFormValues = z.infer<typeof verifyEmailSchema>
 export function VerifyEmailForm({ email, ...props }: TVerifyEmailFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [cooldown, setCooldown] = useState(120)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const startCooldown = () => {
-    setCooldown(120)
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    intervalRef.current = setInterval(() => {
-      setCooldown((prev) => {
-        if (prev <= 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
-
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setCooldown((prev) => {
-        if (prev <= 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [])
+  const { cooldown, restart } = useResendCooldown()
 
   const form = useForm<TFormValues>({
     resolver: zodResolver(verifyEmailSchema),
@@ -110,7 +76,7 @@ export function VerifyEmailForm({ email, ...props }: TVerifyEmailFormProps) {
 
         if (result.success) {
           toast.success(result.message)
-          startCooldown()
+          restart()
           return
         }
       } catch (error) {
@@ -133,46 +99,37 @@ export function VerifyEmailForm({ email, ...props }: TVerifyEmailFormProps) {
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            <Controller
+            <FormController
               name="code"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Verification Code{' '}
-                      <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldDescription>
-                      Enter the 6-digit code sent to your email
-                    </FieldDescription>
-                  </FieldContent>
-                  <div className="flex justify-center">
-                    <InputOTP
-                      maxLength={6}
-                      value={field.value}
-                      onChange={field.onChange}
-                      disabled={isPending}
-                    >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+              orientation="responsive"
+              label={
+                <>
+                  Verification Code <span className="text-destructive">*</span>
+                </>
+              }
+              description="Enter the 6-digit code sent to your email"
+            >
+              {(field) => (
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={isPending}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
               )}
-            />
+            </FormController>
             <Field>
               <Button
                 type="submit"
@@ -190,15 +147,24 @@ export function VerifyEmailForm({ email, ...props }: TVerifyEmailFormProps) {
                   ? 'Verifying...'
                   : 'Verify Email'}
               </Button>
-              <div className="px-6 text-center">
-                <button
+              <div className="flex flex-col items-center gap-2">
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={handleResend}
                   disabled={cooldown > 0 || isPending}
-                  className="text-sm text-muted-foreground underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
-                </button>
+                </Button>
+                <FieldDescription>
+                  <Link
+                    href="/login"
+                    className="underline-offset-4 hover:underline"
+                  >
+                    Back to login
+                  </Link>
+                </FieldDescription>
               </div>
             </Field>
           </FieldGroup>

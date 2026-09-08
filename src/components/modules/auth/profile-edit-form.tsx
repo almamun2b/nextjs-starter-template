@@ -1,6 +1,7 @@
 'use client'
 
 import { updateMyProfile } from '@/app/actions/user'
+import { EmptyState } from '@/components/shared/empty-state'
 import { FormController } from '@/components/shared/FormController'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -36,7 +37,7 @@ import { useAuth } from '@/providers/auth-provider'
 import type { TUpdateProfileInput } from '@/types/user.types'
 import { profileFormSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeftIcon } from 'lucide-react'
+import { ArrowLeftIcon, UserXIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
@@ -71,9 +72,12 @@ export function ProfileEditForm() {
 
   if (!user) {
     return (
-      <div className="rounded-lg border border-destructive/50 p-6 text-center text-destructive">
-        Failed to load profile. Please try again later.
-      </div>
+      <EmptyState
+        icon={UserXIcon}
+        tone="destructive"
+        title="Failed to load profile"
+        description="Please try again later."
+      />
     )
   }
 
