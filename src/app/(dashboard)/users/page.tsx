@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constant/permissions'
+import { requirePermission } from '@/lib/auth/dal'
 import { userQuerySchema } from '@/validation/user-query.validation'
 import { type Metadata } from 'next'
 import { UsersTableSection } from './_components/users-table-section'
@@ -14,6 +16,10 @@ type TUsersPageProps = {
 }
 
 const UsersPage = async ({ searchParams }: TUsersPageProps) => {
+  // The proxy already turns most unauthorized traffic away, but that is an
+  // optimistic pre-filter — this is the check that actually holds.
+  await requirePermission(PERMISSIONS.USERS_READ)
+
   // `.catch()` guards on every field mean a malformed or stale URL degrades to
   // defaults instead of throwing.
   const params = userQuerySchema.parse(await searchParams)

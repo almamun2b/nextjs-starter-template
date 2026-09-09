@@ -5,7 +5,9 @@ import {
   type TFilterConfig,
   type TToolbarChangeEvent,
 } from '@/components/shared/table'
+import { Can } from '@/components/shared/can'
 import { Button } from '@/components/ui/button'
+import { PERMISSIONS } from '@/constant/permissions'
 import {
   USER_ROLE_OPTIONS,
   USER_STATUS_OPTIONS,
@@ -81,10 +83,12 @@ export function UsersToolbar({ params }: UsersToolbarProps) {
         isPending={isPending}
         searchPlaceholder="Search users..."
         actions={
-          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-            <PlusIcon className="size-3.5" />
-            Add user
-          </Button>
+          <Can permission={PERMISSIONS.USERS_CREATE}>
+            <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+              <PlusIcon className="size-3.5" />
+              Add user
+            </Button>
+          </Can>
         }
       />
 

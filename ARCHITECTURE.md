@@ -27,14 +27,14 @@ Auth state lives in two `HttpOnly` cookies set by the backend: `accessToken`
 and `refreshToken`. Next.js never reads or writes these directly except to
 forward them.
 
-1. **Edge guard — [`src/proxy.ts`](src/proxy.ts).** Runs on every request
-   (matcher excludes `api`, `_next`, static assets). It only checks whether
-   `accessToken`/`refreshToken` cookies are _present_ — it does not verify or
-   decode them. Logged-out users are redirected away from dashboard routes
-   (`/dashboard`, `/profile`, `/settings`, `/users`, `/change-password`) to
-   `/login`; logged-in users are redirected away from `(auth)` routes to
-   `/dashboard`. This is presence-based routing, not authorization — the
-   backend is the source of truth for whether a token is actually valid.
+1. **Route guard — [`src/proxy.ts`](src/proxy.ts).** Runs on every request
+   (matcher excludes `api`, `_next`, static assets) on the Node.js runtime. It
+   verifies the access token's signature and gates routes by role against
+   `src/lib/auth/route-policy.ts`. Logged-out users go to
+   `/login?next=<destination>`; logged-in users are redirected away from
+   `(auth)` routes to `/dashboard`; a role that lacks the route's permission is
+   rewritten to `/403`. This is an optimistic pre-filter — see
+   [Authorization](#authorization-rbac) for why the real check lives in the DAL.
 
 2. **Cookie forwarding — `$fetch`'s `onRequest`/`onResponse` hooks.** Server
    Actions and Server Components run on the Node server, not the browser, so
@@ -53,16 +53,84 @@ forward them.
    multiple refresh calls. **Do not duplicate this logic** — anything that
    needs auto-refresh should go through `$fetch`.
 
-4. **Reading the session server-side — [`src/lib/session.ts`](src/lib/session.ts).**
-   `getSession()` decodes the `accessToken` JWT (via `ACCESS_TOKEN_SECRET`)
-   for server-side reads like the header's user display. Note:
-   `src/lib/session2.ts` is a second, currently-unused implementation of the
-   same idea (a signed session cookie derived from the access token) — it's
-   not imported anywhere yet. Treat `session.ts` as the active implementation
-   until that work lands or the dead file is removed.
+4. **Reading the session server-side — [`src/lib/auth/dal.ts`](src/lib/auth/dal.ts).**
+   `getCurrentUser()` returns the signed-in `IUser` (or `null`) by calling
+   `/users/me` through `$fetch`, memoized with React `cache()`. It is the one
+   server-side source of session truth — the root layout, the header, and every
+   authorization guard all go through it. JWT decoding is confined to
+   [`src/lib/auth/token.ts`](src/lib/auth/token.ts), used only by the proxy's
+   optimistic check.
+
+   > `src/lib/session.ts` and `src/lib/session2.ts` are **kept deliberately as
+   > reference implementations and are imported by nothing**. `session.ts` is
+   > an earlier cookie-decoding session reader; `session2.ts` sketches a
+   > separate signed `session` cookie derived from the access token. Read them
+   > for ideas, but do not wire them into new code — they bypass the DAL, and
+   > `session2.ts` sets `sameSite: 'none'`, which contradicts the cookie model
+   > described above. `getCurrentUser()` is the supported entry point.
 
 Token handling must stay in `HttpOnly` cookies end-to-end — never move it to
 `localStorage` or client-readable storage.
+
+## Authorization (RBAC)
+
+Roles are `SUPER_ADMIN | ADMIN | USER` (`IUser.role`, also a claim on the access
+token). Authorization is expressed once, as a permission catalog, and enforced
+at four layers — the first three of which are real, the fourth cosmetic.
+
+**The catalog.** `src/constant/permissions.ts` defines `PERMISSIONS` (a closed
+`TPermission` union like `users:update:role`) and `ROLE_PERMISSIONS`, the
+explicit role → permissions table. There is no `'*'` wildcard: SUPER_ADMIN's
+grants are enumerated so the table can be read and audited. Adding a capability
+means adding it here first, which makes a typo anywhere a compile error.
+
+**The rules.** `src/lib/auth/permissions.ts` is pure and isomorphic — no
+cookies, no network — so the server guards, the proxy, and the client `<Can>`
+component all run the _same_ functions and cannot drift:
+
+- `can(actor, permission)` — does the role hold it at all?
+- `canActOnUser(actor, target, permission)` / `explainDenial(...)` — may they
+  exercise it against _this record_? This is the IDOR guard: destructive and
+  privilege-changing actions never apply to oneself; an actor may only act on
+  someone strictly junior (SUPER_ADMIN excepted); read-only permissions skip
+  the seniority rule, since listing a record already exposes it.
+- `assignableRoles(actor, permission)` — which roles they may grant, so an
+  ADMIN cannot mint or promote a peer.
+
+**The layers.**
+
+1. **Proxy — optimistic** (`src/proxy.ts`). Verifies the access-token signature
+   with `src/lib/auth/token.ts` (Node.js runtime, so `jsonwebtoken` works —
+   no Edge-compatible verifier needed) and checks the role against
+   `src/lib/auth/route-policy.ts`. A denial is a **rewrite** to `/403`, not a
+   redirect, so the URL is preserved and `src/app/403/page.tsx` raises the same
+   `forbidden()` interrupt a page guard would. Signed-out users get
+   `/login?next=<destination>`, which the login page reads back.
+   Crucially, an **expired** access token alongside a refresh token still reads
+   as signed in and skips role gating — verifying strictly here would defeat
+   `$fetch`'s silent refresh and log people out on every token rotation. It
+   never authorizes on unverified claims.
+2. **Data Access Layer — authoritative** (`src/lib/auth/dal.ts`, `server-only`).
+   `verifySession()`, `requirePermission()`, `requireCanActOnUser()`. The role
+   comes from `/users/me` through `$fetch` — not from decoding the token —
+   so it survives a token rotation and honours the `PROFILE` cache tag. React
+   `cache()` collapses it to one backend call per render pass. Guards live in
+   _pages_, not in `(dashboard)/layout.tsx`: layouts do not re-run on
+   client-side navigation, so they are not a boundary.
+3. **Server Actions — mandatory** (`src/app/actions/user.ts`). Every action
+   opens with a guard. Actions are independent POST entry points reachable
+   without the UI, so a page-level check does not cover them. This is verified:
+   a direct POST of the `deleteUserHard` action from an authenticated ADMIN
+   session returns 403 before reaching the backend.
+4. **UI — cosmetic.** `useAuth()` exposes `can` / `canActOn` / `explainDenial` /
+   `assignableRoles`; `<Can>` (`src/components/shared/can.tsx`) gates subtrees;
+   the sidebar filters nav items by the same permission the route policy uses.
+   In the users table, an action the viewer's role can never perform is
+   _hidden_, while one blocked only by the target row is _disabled with a
+   reason_ — a silently dead control reads as a bug.
+
+The backend remains the final authority throughout; this layer makes the UI and
+the server agree with it rather than replacing it.
 
 ## Server Actions and cache invalidation
 

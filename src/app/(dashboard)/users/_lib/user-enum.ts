@@ -1,11 +1,9 @@
 import {
-  readUserRole,
   type TUserGenderValue,
   type TUserRoleValue,
   type TUserStatusValue,
 } from '@/lib/user-format'
 import { type Gender, type UserRole, type UserStatus } from '@/types/enum.types'
-import { type IUser } from '@/types/user.types'
 
 /*
  * ---------------------------------------------------------------------------
@@ -31,11 +29,7 @@ const toStatusParam = (value: TUserStatusValue): UserStatus =>
 const toGenderParam = (value: TUserGenderValue): Gender =>
   value as unknown as Gender
 
-/** `updateUserRole` and `deleteUserHard` are super-admin-only endpoints. */
-const isSuperAdmin = (user: IUser | null): boolean =>
-  user !== null && readUserRole(user.role) === 'SUPER_ADMIN'
-
-export { isSuperAdmin, toGenderParam, toRoleParam, toStatusParam }
+export { toGenderParam, toRoleParam, toStatusParam }
 
 // Re-exported so existing users-feature imports keep resolving from one place.
 export {

@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constant/permissions'
+import { requirePermission } from '@/lib/auth/dal'
 import { EmptyState } from '@/components/shared/empty-state'
 import { SettingsIcon } from 'lucide-react'
 import { type Metadata } from 'next'
@@ -7,7 +9,9 @@ export const metadata: Metadata = {
   description: 'Application and workspace preferences.',
 }
 
-const SettingsPage = () => {
+const SettingsPage = async () => {
+  await requirePermission(PERMISSIONS.SETTINGS_READ)
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-6">
       <header className="space-y-1">

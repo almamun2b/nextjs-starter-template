@@ -1,11 +1,11 @@
 import { ThemeToggle } from '@/components/shared/theme-toggle'
-import { getIsLoggedIn } from '@/lib/session'
+import { getCurrentUser } from '@/lib/auth/dal'
 import { Home } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '../ui/button'
 
 const Header = async () => {
-  const isLoggedIn = await getIsLoggedIn()
+  const isLoggedIn = (await getCurrentUser()) !== null
   const navMenus = [{ label: 'Home', href: '/', icon: null }]
   return (
     <nav className="fixed z-50 h-14 w-full border bg-background">

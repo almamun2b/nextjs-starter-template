@@ -18,7 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { PERMISSIONS } from '@/constant/permissions'
 import { USER_ROLE_OPTIONS } from '@/constant/user'
+import { useAuth } from '@/providers/auth-provider'
 import { type IUser } from '@/types/user.types'
 import { Loader2Icon } from 'lucide-react'
 import { useState, useTransition } from 'react'
@@ -40,9 +42,17 @@ export function UserRoleDialog({
   onClose,
   onSuccess,
 }: UserRoleDialogProps) {
+  const { assignableRoles } = useAuth()
   const currentRole = readUserRole(user.role)
   const [role, setRole] = useState<TUserRoleValue>(currentRole)
   const [isPending, startTransition] = useTransition()
+
+  // Mirrors `requireAssignableRole` in the Server Action: nobody may promote
+  // anyone to their own level or above. The action re-checks regardless.
+  const allowedRoles = assignableRoles(PERMISSIONS.USERS_UPDATE_ROLE)
+  const roleOptions = USER_ROLE_OPTIONS.filter((option) =>
+    allowedRoles.includes(option.value)
+  )
 
   const handleSubmit = () => {
     startTransition(async () => {
@@ -87,7 +97,7 @@ export function UserRoleDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {USER_ROLE_OPTIONS.map((option) => (
+              {roleOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>

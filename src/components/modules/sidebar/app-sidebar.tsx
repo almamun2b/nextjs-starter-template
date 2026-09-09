@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation'
 
 import { NavMain } from '@/components/modules/sidebar/nav-main'
 import { NavUser } from '@/components/modules/sidebar/nav-user'
+import { PERMISSIONS, type TPermission } from '@/constant/permissions'
+import { useAuth } from '@/providers/auth-provider'
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +18,7 @@ import {
   GalleryVerticalEnd,
   KeyRound,
   Layout,
+  type LucideIcon,
   SettingsIcon,
   UserIcon,
   Users,
@@ -23,24 +26,65 @@ import {
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar>
 
-const NAV_MAIN_ITEMS = [
-  { title: 'Dashboard', url: '/dashboard', icon: Layout },
-  { title: 'Users', url: '/users', icon: Users },
+interface INavItem {
+  title: string
+  url: string
+  icon: LucideIcon
+  /**
+   * Permission required to see the link. Keep it identical to the route's
+   * entry in `src/lib/auth/route-policy.ts` — a link the proxy would answer
+   * with a 403 has no business being in the navigation.
+   */
+  permission: TPermission
+}
+
+const NAV_MAIN_ITEMS: readonly INavItem[] = [
+  {
+    title: 'Dashboard',
+    url: '/dashboard',
+    icon: Layout,
+    permission: PERMISSIONS.DASHBOARD_READ,
+  },
+  {
+    title: 'Users',
+    url: '/users',
+    icon: Users,
+    permission: PERMISSIONS.USERS_READ,
+  },
 ]
 
-const NAV_SECONDARY_ITEMS = [
-  { title: 'Profile', url: '/profile', icon: UserIcon },
-  { title: 'Settings', url: '/settings', icon: SettingsIcon },
-  { title: 'Change Password', url: '/change-password', icon: KeyRound },
+const NAV_SECONDARY_ITEMS: readonly INavItem[] = [
+  {
+    title: 'Profile',
+    url: '/profile',
+    icon: UserIcon,
+    permission: PERMISSIONS.PROFILE_READ,
+  },
+  {
+    title: 'Settings',
+    url: '/settings',
+    icon: SettingsIcon,
+    permission: PERMISSIONS.SETTINGS_READ,
+  },
+  {
+    title: 'Change Password',
+    url: '/change-password',
+    icon: KeyRound,
+    permission: PERMISSIONS.PROFILE_PASSWORD,
+  },
 ]
 
 export function AppSidebar(props: AppSidebarProps) {
   const pathname = usePathname()
-  const withActiveState = (items: typeof NAV_MAIN_ITEMS) =>
-    items.map((item) => ({
-      ...item,
-      isActive: pathname === item.url || pathname.startsWith(`${item.url}/`),
-    }))
+  const { can } = useAuth()
+
+  const visibleItems = (items: readonly INavItem[]) =>
+    items
+      .filter((item) => can(item.permission))
+      .map((item) => ({
+        ...item,
+        isActive: pathname === item.url || pathname.startsWith(`${item.url}/`),
+      }))
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -56,12 +100,12 @@ export function AppSidebar(props: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain
-          group={{ label: 'Dashboard', items: withActiveState(NAV_MAIN_ITEMS) }}
+          group={{ label: 'Dashboard', items: visibleItems(NAV_MAIN_ITEMS) }}
         />
         <NavMain
           group={{
             label: 'Settings',
-            items: withActiveState(NAV_SECONDARY_ITEMS),
+            items: visibleItems(NAV_SECONDARY_ITEMS),
           }}
           className="mt-auto"
         />

@@ -17,23 +17,60 @@ import {
   Trash2Icon,
   UserCogIcon,
 } from 'lucide-react'
+import { type IAbility, type TUserAbilities } from '../_lib/user-abilities'
 import { type TUserDialogAction } from '../_lib/user-dialog'
 
 interface UserActionsMenuProps {
   user: IUser
-  /** Viewer is a SUPER_ADMIN — required for role changes and hard deletes. */
-  canManageRoles: boolean
-  /** The row is the signed-in user; self-destructive actions are blocked. */
-  isSelf: boolean
+  /** Per-row permission verdicts from `buildUserAbilities`. */
+  abilities: TUserAbilities
   onAction: (action: TUserDialogAction, user: IUser) => void
+}
+
+interface ActionItemProps {
+  ability: IAbility
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  destructive?: boolean
+  onSelect: () => void
+}
+
+/**
+ * Hidden when the viewer's role never permits the action, disabled with an
+ * explanation when only this particular row is off limits.
+ */
+function ActionItem({
+  ability,
+  icon: Icon,
+  label,
+  destructive,
+  onSelect,
+}: ActionItemProps) {
+  if (!ability.held) return null
+
+  return (
+    <DropdownMenuItem
+      variant={destructive ? 'destructive' : undefined}
+      disabled={!ability.allowed}
+      title={ability.reason ?? undefined}
+      onSelect={onSelect}
+    >
+      <Icon />
+      {label}
+    </DropdownMenuItem>
+  )
 }
 
 export function UserActionsMenu({
   user,
-  canManageRoles,
-  isSelf,
+  abilities,
   onAction,
 }: UserActionsMenuProps) {
+  const select = (action: TUserDialogAction) => () => onAction(action, user)
+  const hasManagementItems = abilities.status.held || abilities.role.held
+  const hasDeleteItems =
+    abilities['delete-soft'].held || abilities['delete-hard'].held
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -46,54 +83,50 @@ export function UserActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onSelect={() => onAction('view', user)}>
-          <EyeIcon />
-          View details
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onAction('edit', user)}>
-          <PencilIcon />
-          Edit
-        </DropdownMenuItem>
+        <ActionItem
+          ability={abilities.view}
+          icon={EyeIcon}
+          label="View details"
+          onSelect={select('view')}
+        />
+        <ActionItem
+          ability={abilities.edit}
+          icon={PencilIcon}
+          label="Edit"
+          onSelect={select('edit')}
+        />
 
-        <DropdownMenuSeparator />
+        {hasManagementItems && <DropdownMenuSeparator />}
 
-        <DropdownMenuItem
-          disabled={isSelf}
-          onSelect={() => onAction('status', user)}
-        >
-          <UserCogIcon />
-          Change status
-        </DropdownMenuItem>
-        {canManageRoles && (
-          <DropdownMenuItem
-            disabled={isSelf}
-            onSelect={() => onAction('role', user)}
-          >
-            <ShieldIcon />
-            Change role
-          </DropdownMenuItem>
-        )}
+        <ActionItem
+          ability={abilities.status}
+          icon={UserCogIcon}
+          label="Change status"
+          onSelect={select('status')}
+        />
+        <ActionItem
+          ability={abilities.role}
+          icon={ShieldIcon}
+          label="Change role"
+          onSelect={select('role')}
+        />
 
-        <DropdownMenuSeparator />
+        {hasDeleteItems && <DropdownMenuSeparator />}
 
-        <DropdownMenuItem
-          variant="destructive"
-          disabled={isSelf}
-          onSelect={() => onAction('delete-soft', user)}
-        >
-          <Trash2Icon />
-          Delete
-        </DropdownMenuItem>
-        {canManageRoles && (
-          <DropdownMenuItem
-            variant="destructive"
-            disabled={isSelf}
-            onSelect={() => onAction('delete-hard', user)}
-          >
-            <Trash2Icon />
-            Delete permanently
-          </DropdownMenuItem>
-        )}
+        <ActionItem
+          ability={abilities['delete-soft']}
+          icon={Trash2Icon}
+          label="Delete"
+          destructive
+          onSelect={select('delete-soft')}
+        />
+        <ActionItem
+          ability={abilities['delete-hard']}
+          icon={Trash2Icon}
+          label="Delete permanently"
+          destructive
+          onSelect={select('delete-hard')}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )

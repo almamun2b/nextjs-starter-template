@@ -1,4 +1,4 @@
-import { me } from '@/app/actions/user'
+import { getCurrentUser } from '@/lib/auth/dal'
 import { AuthProvider } from '@/providers/auth-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -28,8 +28,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const userResult = await me().catch(() => null)
-  const user = userResult?.success && userResult.data ? userResult.data : null
+  // Memoized in the DAL, so this render's guards reuse the same profile read.
+  const user = await getCurrentUser()
 
   return (
     <html

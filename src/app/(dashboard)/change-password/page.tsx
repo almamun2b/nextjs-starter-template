@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constant/permissions'
+import { requirePermission } from '@/lib/auth/dal'
 import { ChangePasswordForm } from '@/components/modules/user/change-password-form'
 import { type Metadata } from 'next'
 
@@ -6,7 +8,9 @@ export const metadata: Metadata = {
   description: 'Update your account password.',
 }
 
-const ChangePasswordPage = () => {
+const ChangePasswordPage = async () => {
+  await requirePermission(PERMISSIONS.PROFILE_PASSWORD)
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-6">
       <header className="space-y-1">

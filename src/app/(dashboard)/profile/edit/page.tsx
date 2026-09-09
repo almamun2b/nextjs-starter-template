@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constant/permissions'
+import { requirePermission } from '@/lib/auth/dal'
 import { ProfileEditForm } from '@/components/modules/auth/profile-edit-form'
 import { type Metadata } from 'next'
 
@@ -7,6 +9,8 @@ export const metadata: Metadata = {
 }
 
 const ProfileEditPage = async () => {
+  await requirePermission(PERMISSIONS.PROFILE_UPDATE)
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-6">
       <header className="space-y-1">

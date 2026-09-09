@@ -23,7 +23,14 @@ import { useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
-type TLoginFormProps = React.ComponentProps<'div'>
+type TLoginFormProps = React.ComponentProps<'div'> & {
+  /**
+   * Where to land after a successful sign-in. The page resolves it from the
+   * `?next=` the proxy sets when it turns a signed-out visitor away, so people
+   * come back to the page they were actually trying to reach.
+   */
+  redirectTo?: string
+}
 
 interface DemoCredential {
   type: string
@@ -49,7 +56,7 @@ const DEMO_CREDENTIALS: DemoCredential[] = [
   },
 ]
 
-export function LoginForm({ ...props }: TLoginFormProps) {
+export function LoginForm({ redirectTo = '/', ...props }: TLoginFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -69,7 +76,7 @@ export function LoginForm({ ...props }: TLoginFormProps) {
       if (result.success) {
         toast.success(result.message)
         form.reset()
-        router.replace('/')
+        router.replace(redirectTo)
         return
       }
 

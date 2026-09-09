@@ -13,8 +13,9 @@ import { type IUser } from '@/types/user.types'
 import { type TUserQueryParams } from '@/validation/user-query.validation'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { PERMISSIONS } from '@/constant/permissions'
+import { canActOnUser } from '@/lib/auth/permissions'
 import { type TUserDialogState } from '../_lib/user-dialog'
-import { isSuperAdmin } from '../_lib/user-enum'
 import { buildQueryKey } from '../_lib/users-query'
 import { useUsersParams } from '../_lib/users-params-context'
 import { EditUserDialog } from './dialogs/edit-user-dialog'
@@ -49,12 +50,8 @@ export function UsersTable({ users, meta, params }: UsersTableProps) {
     setSelectedIds([])
   }
 
-  const canManageRoles = isSuperAdmin(viewer)
-  const viewerId = viewer?.id ?? null
-
   const columns = getUsersColumns({
-    canManageRoles,
-    viewerId,
+    viewer,
     onAction: (action, user) => setDialog({ action, user }),
   })
 
@@ -106,8 +103,12 @@ export function UsersTable({ users, meta, params }: UsersTableProps) {
         }}
         selectedIds={selectedIds}
         onChange={handleTableChange}
-        // Users cannot bulk-select their own account.
-        isRowSelectable={(user) => user.id !== viewerId}
+        // Only rows the viewer could actually act on are selectable — that
+        // covers their own account and anyone at or above their own role, so
+        // the bulk bar never counts rows a bulk action would be refused.
+        isRowSelectable={(user) =>
+          canActOnUser(viewer, user, PERMISSIONS.USERS_DELETE)
+        }
         // The pending skeleton for query changes — the page is server-rendered
         // with real rows, so this is the only thing that ever shows skeletons.
         isLoading={isPending}

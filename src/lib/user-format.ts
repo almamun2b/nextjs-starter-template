@@ -19,7 +19,7 @@ export type TBadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline'
  * both shapes, so these readers stay correct whichever form arrives.
  */
 
-const readUserRole = (role: IUser['role']): TUserRoleValue =>
+const readUserRole = (role: IUser['role'] | null | undefined): TUserRoleValue =>
   (normalizeEnumValue(UserRole, role) ?? 'USER') as TUserRoleValue
 
 const readUserStatus = (status: IUser['status']): TUserStatusValue =>

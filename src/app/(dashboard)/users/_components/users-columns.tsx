@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { date } from '@/lib/date'
 import { type IUser } from '@/types/user.types'
 import { CheckCircle2Icon, MinusCircleIcon } from 'lucide-react'
+import { buildUserAbilities } from '../_lib/user-abilities'
 import { type TUserDialogAction } from '../_lib/user-dialog'
 import { getUserDisplayName, getUserInitials } from '@/lib/user-format'
 import {
@@ -27,8 +28,8 @@ function formatDate(value: Date | string | null): string {
 }
 
 interface GetUsersColumnsOptions {
-  canManageRoles: boolean
-  viewerId: string | null
+  /** The signed-in user; row abilities are resolved against them. */
+  viewer: IUser | null
   onAction: (action: TUserDialogAction, user: IUser) => void
 }
 
@@ -38,8 +39,7 @@ interface GetUsersColumnsOptions {
  * lockstep with the server-rendered skeleton.
  */
 export function getUsersColumns({
-  canManageRoles,
-  viewerId,
+  viewer,
   onAction,
 }: GetUsersColumnsOptions): TTableColumn<IUser>[] {
   const renderers: Record<string, TTableColumn<IUser>['render']> = {
@@ -94,8 +94,7 @@ export function getUsersColumns({
     actions: (user) => (
       <UserActionsMenu
         user={user}
-        canManageRoles={canManageRoles}
-        isSelf={viewerId === user.id}
+        abilities={buildUserAbilities(viewer, user)}
         onAction={onAction}
       />
     ),

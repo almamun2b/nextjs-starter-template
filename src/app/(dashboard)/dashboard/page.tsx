@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constant/permissions'
+import { checkPermission, requirePermission } from '@/lib/auth/dal'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Button } from '@/components/ui/button'
 import { LayoutDashboardIcon } from 'lucide-react'
@@ -9,7 +11,12 @@ export const metadata: Metadata = {
   description: 'An overview of your workspace.',
 }
 
-const DashboardPage = () => {
+const DashboardPage = async () => {
+  await requirePermission(PERMISSIONS.DASHBOARD_READ)
+  // Without this the call to action would send a plain USER straight into a
+  // 403 — a dead end is worse than no button.
+  const canManageUsers = await checkPermission(PERMISSIONS.USERS_READ)
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-6">
       <header className="space-y-1">
@@ -23,11 +30,17 @@ const DashboardPage = () => {
       <EmptyState
         icon={LayoutDashboardIcon}
         title="No overview yet"
-        description="Start by managing your user accounts."
+        description={
+          canManageUsers
+            ? 'Start by managing your user accounts.'
+            : 'Your activity will show up here as it comes in.'
+        }
         action={
-          <Button asChild size="sm">
-            <Link href="/users">Go to Users</Link>
-          </Button>
+          canManageUsers ? (
+            <Button asChild size="sm">
+              <Link href="/users">Go to Users</Link>
+            </Button>
+          ) : undefined
         }
       />
     </div>

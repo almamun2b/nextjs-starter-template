@@ -20,12 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { PERMISSIONS } from '@/constant/permissions'
 import {
   USER_GENDER_OPTIONS,
   USER_ROLE_OPTIONS,
   USER_STATUS_OPTIONS,
 } from '@/constant/user'
 import { isFormInputField } from '@/lib/form'
+import { useAuth } from '@/providers/auth-provider'
 import { type TCreateUserInput } from '@/types/user.types'
 import {
   createUserSchema,
@@ -55,6 +57,14 @@ export function CreateUserDialog({
   onSuccess,
 }: CreateUserDialogProps) {
   const [isPending, startTransition] = useTransition()
+  const { assignableRoles } = useAuth()
+
+  // An ADMIN can create accounts but not peers or superiors — same rule
+  // `requireAssignableRole` enforces inside `createUserManually`.
+  const allowedRoles = assignableRoles(PERMISSIONS.USERS_CREATE)
+  const roleOptions = USER_ROLE_OPTIONS.filter((option) =>
+    allowedRoles.includes(option.value)
+  )
 
   const form = useForm<TCreateUserForm>({
     resolver: zodResolver(createUserSchema),
@@ -219,7 +229,7 @@ export function CreateUserDialog({
                       <SelectValue placeholder="Default" />
                     </SelectTrigger>
                     <SelectContent>
-                      {USER_ROLE_OPTIONS.map((option) => (
+                      {roleOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
