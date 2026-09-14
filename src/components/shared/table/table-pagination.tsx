@@ -6,7 +6,6 @@ import {
   PaginationContent,
   PaginationEllipsis,
   PaginationItem,
-  PaginationLink,
 } from '@/components/ui/pagination'
 import {
   Select,
@@ -17,180 +16,196 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
-import { type TablePaginationProps } from './types'
+import { type TPaginationChangeEvent, type TPaginationItem } from './types'
 
-export function TablePagination({
-  meta,
-  selectedCount = 0,
-  onPageChange,
-  onPageSizeChange,
+function range(start: number, end: number): number[] {
+  if (end < start) return []
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
+
+/**
+ * Builds a windowed page list such as `1 … 498 499 500 501 502 … 10000`.
+ *
+ * The returned array is bounded by `boundaryCount * 2 + siblingCount * 2 + 5`
+ * regardless of `totalPages`, so rendering 10,000+ pages costs exactly the same
+ * as rendering 10.
+ */
+export function getPaginationRange(
+  page: number,
+  totalPages: number,
+  options: { siblingCount?: number; boundaryCount?: number } = {}
+): TPaginationItem[] {
+  const { siblingCount = 1, boundaryCount = 1 } = options
+
+  if (totalPages <= 0) return []
+
+  const current = Math.min(Math.max(page, 1), totalPages)
+
+  // Boundaries + both ellipses + the sibling window + the current page.
+  const totalSlots = boundaryCount * 2 + siblingCount * 2 + 3
+
+  if (totalPages <= totalSlots + 2) {
+    return range(1, totalPages)
+  }
+
+  const startPages = range(1, boundaryCount)
+  const endPages = range(totalPages - boundaryCount + 1, totalPages)
+
+  const siblingsStart = Math.max(
+    Math.min(
+      current - siblingCount,
+      totalPages - boundaryCount - siblingCount * 2 - 1
+    ),
+    boundaryCount + 2
+  )
+  const siblingsEnd = Math.min(
+    Math.max(current + siblingCount, boundaryCount + siblingCount * 2 + 2),
+    totalPages - boundaryCount - 1
+  )
+
+  const items: TPaginationItem[] = [...startPages]
+
+  if (siblingsStart > boundaryCount + 2) {
+    items.push('ellipsis')
+  } else if (boundaryCount + 1 < totalPages - boundaryCount) {
+    items.push(boundaryCount + 1)
+  }
+
+  items.push(...range(siblingsStart, siblingsEnd))
+
+  if (siblingsEnd < totalPages - boundaryCount - 1) {
+    items.push('ellipsis')
+  } else if (totalPages - boundaryCount > boundaryCount) {
+    items.push(totalPages - boundaryCount)
+  }
+
+  items.push(...endPages)
+
+  return items
+}
+
+export interface DataTablePaginationProps {
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+  onChange: (event: TPaginationChangeEvent) => void
+  pageSizeOptions?: readonly number[]
+  disabled?: boolean
+  className?: string
+}
+
+export function DataTablePagination({
+  page,
+  pageSize,
+  total,
+  totalPages,
+  onChange,
   pageSizeOptions = [10, 20, 50, 100],
+  disabled = false,
   className,
-}: TablePaginationProps) {
-  const { page, limit, total, totalPage } = meta
-  const start = (page - 1) * limit + 1
-  const end = Math.min(page * limit, total)
-  const totalPages = totalPage
+}: DataTablePaginationProps) {
+  // Always rendered — including when empty — so results changing never
+  // collapses this bar and shifts the page.
+  const safeTotalPages = Math.max(totalPages, 1)
+  const first = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const last = total === 0 ? 0 : Math.min(page * pageSize, total)
+  const items = getPaginationRange(page, safeTotalPages)
 
-  const pages = getPageNumbers(page, totalPages)
+  const goTo = (nextPage: number, source: TPaginationChangeEvent['source']) => {
+    onChange({ page: nextPage, pageSize, source })
+  }
 
   return (
     <div
       className={cn(
-        'flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between',
+        'flex h-auto flex-col gap-3 border-t px-4 py-3 sm:h-14 sm:flex-row sm:items-center sm:justify-between sm:py-0',
         className
       )}
     >
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="text-sm whitespace-nowrap text-muted-foreground">
-          {selectedCount > 0 ? (
-            <span className="font-medium text-foreground">
-              {selectedCount} of {total} row(s) selected
-            </span>
-          ) : (
-            <span>
-              Showing {start} to {end} of {total} row(s)
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm whitespace-nowrap text-muted-foreground">
-            Rows per page:
-          </span>
-          <Select
-            value={String(limit)}
-            onValueChange={(v) => onPageSizeChange(Number(v))}
+      <div className="flex items-center gap-3">
+        <p
+          className="text-sm whitespace-nowrap text-muted-foreground tabular-nums"
+          aria-live="polite"
+        >
+          Showing {first}–{last} of {total}
+        </p>
+        <Select
+          value={String(pageSize)}
+          disabled={disabled}
+          onValueChange={(value) =>
+            onChange({ page: 1, pageSize: Number(value), source: 'page-size' })
+          }
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-auto"
+            aria-label="Rows per page"
           >
-            <SelectTrigger className="h-8 w-25 text-sm">
-              <SelectValue placeholder="Rows" />
-            </SelectTrigger>
-            <SelectContent>
-              {pageSizeOptions.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="text-sm whitespace-nowrap text-muted-foreground">
-          Page {page} of {totalPages}
-        </div>
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              {page === 1 ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="pointer-events-none pl-1.5! opacity-50"
-                  aria-label="Go to previous page"
-                  disabled
-                >
-                  <ChevronLeftIcon className="size-4" />
-                  <span className="hidden sm:block">Previous</span>
-                </Button>
-              ) : (
-                <PaginationLink
-                  href="#"
-                  size="default"
-                  className="pl-1.5!"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    onPageChange(page - 1)
-                  }}
-                >
-                  <ChevronLeftIcon data-icon="inline-start" />
-                  <span className="hidden sm:block">Previous</span>
-                </PaginationLink>
-              )}
-            </PaginationItem>
-            {pages.map((pageNum) => (
-              <PaginationItem key={String(pageNum)}>
-                {pageNum === 'ellipsis' ? (
-                  <PaginationEllipsis />
-                ) : (
-                  <PaginationLink
-                    href="#"
-                    isActive={pageNum === page}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (typeof pageNum === 'number') onPageChange(pageNum)
-                    }}
-                  >
-                    {pageNum}
-                  </PaginationLink>
-                )}
-              </PaginationItem>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {pageSizeOptions.map((option) => (
+              <SelectItem key={option} value={String(option)}>
+                {option} / page
+              </SelectItem>
             ))}
-            <PaginationItem>
-              {page === totalPages ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="pointer-events-none pr-1.5! opacity-50"
-                  aria-label="Go to next page"
-                  disabled
-                >
-                  <span className="hidden sm:block">Next</span>
-                  <ChevronRightIcon className="size-4" />
-                </Button>
-              ) : (
-                <PaginationLink
-                  href="#"
-                  size="default"
-                  className="pr-1.5!"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    onPageChange(page + 1)
-                  }}
-                >
-                  <span className="hidden sm:block">Next</span>
-                  <ChevronRightIcon data-icon="inline-end" />
-                </PaginationLink>
-              )}
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+          </SelectContent>
+        </Select>
       </div>
+
+      <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+        <PaginationContent>
+          <PaginationItem>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={disabled || page <= 1}
+              onClick={() => goTo(page - 1, 'prev')}
+              aria-label="Go to previous page"
+            >
+              <ChevronLeftIcon className="size-4" />
+            </Button>
+          </PaginationItem>
+
+          {items.map((item, index) =>
+            item === 'ellipsis' ? (
+              <PaginationItem key={`ellipsis-${index}`}>
+                <PaginationEllipsis className="size-7" />
+              </PaginationItem>
+            ) : (
+              <PaginationItem key={item}>
+                <Button
+                  type="button"
+                  variant={item === page ? 'outline' : 'ghost'}
+                  size="icon-sm"
+                  disabled={disabled}
+                  onClick={() => goTo(item, 'page')}
+                  aria-label={`Go to page ${item}`}
+                  aria-current={item === page ? 'page' : undefined}
+                  className="tabular-nums"
+                >
+                  {item}
+                </Button>
+              </PaginationItem>
+            )
+          )}
+
+          <PaginationItem>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={disabled || page >= safeTotalPages}
+              onClick={() => goTo(page + 1, 'next')}
+              aria-label="Go to next page"
+            >
+              <ChevronRightIcon className="size-4" />
+            </Button>
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
   )
-}
-
-function getPageNumbers(
-  currentPage: number,
-  totalPages: number
-): (number | 'ellipsis')[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1)
-  }
-
-  const pages: (number | 'ellipsis')[] = []
-  const showFirstLast = 2
-  const showAroundCurrent = 1
-
-  pages.push(1)
-  if (showFirstLast > 1) pages.push(2)
-
-  const start = Math.max(3, currentPage - showAroundCurrent)
-  const end = Math.min(totalPages - 2, currentPage + showAroundCurrent)
-
-  if (start > showFirstLast + 1) {
-    pages.push('ellipsis')
-  }
-
-  for (let i = start; i <= end; i++) {
-    pages.push(i)
-  }
-
-  if (end < totalPages - showFirstLast) {
-    pages.push('ellipsis')
-  }
-
-  if (showFirstLast > 1) pages.push(totalPages - 1)
-  pages.push(totalPages)
-
-  return pages
 }

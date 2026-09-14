@@ -2,6 +2,8 @@
 
 import { resetPassword } from '@/app/actions/auth'
 import { PasswordInput } from '@/components/modules/auth/password-input'
+import { PasswordStrengthMeter } from '@/components/modules/auth/password-strength-meter'
+import { FormController } from '@/components/shared/FormController'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -10,21 +12,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
+import { Field, FieldDescription, FieldGroup } from '@/components/ui/field'
 import { isFormInputField } from '@/lib/form'
 import { TResetPasswordForm } from '@/types/auth.types'
 import { resetPasswordSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 type TResetPasswordFormProps = React.ComponentProps<'div'> & {
@@ -83,65 +79,57 @@ export function ResetPasswordForm({
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            <Controller
+            <FormController
               name="newPassword"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      New Password <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldDescription>
-                      Must be at least 8 characters with uppercase, lowercase,
-                      number, and special character
-                    </FieldDescription>
-                  </FieldContent>
+              orientation="responsive"
+              label={
+                <>
+                  New Password <span className="text-destructive">*</span>
+                </>
+              }
+              description="Must be at least 8 characters with uppercase, lowercase, number, and special character"
+            >
+              {(field, fieldState) => (
+                <>
                   <PasswordInput
                     {...field}
                     id={field.name}
                     aria-invalid={fieldState.invalid}
+                    aria-describedby={`${field.name}-requirements`}
                     placeholder="********"
                     autoComplete="on"
                     className="h-9 max-w-md"
                   />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+                  <PasswordStrengthMeter
+                    value={field.value}
+                    inputId={field.name}
+                    className="max-w-md pt-1"
+                  />
+                </>
               )}
-            />
-            <Controller
+            </FormController>
+            <FormController
               name="confirmPassword"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Confirm password{' '}
-                      <span className="text-destructive">*</span>
-                    </FieldLabel>
-                  </FieldContent>
-                  <PasswordInput
-                    {...field}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="********"
-                    autoComplete="on"
-                    className="h-9 max-w-md"
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+              orientation="responsive"
+              label={
+                <>
+                  Confirm password <span className="text-destructive">*</span>
+                </>
+              }
+            >
+              {(field, fieldState) => (
+                <PasswordInput
+                  {...field}
+                  id={field.name}
+                  aria-invalid={fieldState.invalid}
+                  placeholder="********"
+                  autoComplete="on"
+                  className="h-9 max-w-md"
+                />
               )}
-            />
+            </FormController>
             <Field>
               <Button
                 type="submit"
@@ -159,6 +147,14 @@ export function ResetPasswordForm({
                   ? 'Resetting...'
                   : 'Reset Password'}
               </Button>
+              <FieldDescription className="text-center">
+                <Link
+                  href="/login"
+                  className="underline-offset-4 hover:underline"
+                >
+                  Back to login
+                </Link>
+              </FieldDescription>
             </Field>
           </FieldGroup>
         </form>

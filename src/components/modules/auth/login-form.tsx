@@ -2,6 +2,7 @@
 
 import { loginUser } from '@/app/actions/auth'
 import { PasswordInput } from '@/components/modules/auth/password-input'
+import { FormController } from '@/components/shared/FormController'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -10,14 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
+import { Field, FieldDescription, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { isFormInputField } from '@/lib/form'
 import { TLoginInput } from '@/types/auth.types'
@@ -26,10 +20,17 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
-type TLoginFormProps = React.ComponentProps<'div'>
+type TLoginFormProps = React.ComponentProps<'div'> & {
+  /**
+   * Where to land after a successful sign-in. The page resolves it from the
+   * `?next=` the proxy sets when it turns a signed-out visitor away, so people
+   * come back to the page they were actually trying to reach.
+   */
+  redirectTo?: string
+}
 
 interface DemoCredential {
   type: string
@@ -55,7 +56,7 @@ const DEMO_CREDENTIALS: DemoCredential[] = [
   },
 ]
 
-export function LoginForm({ ...props }: TLoginFormProps) {
+export function LoginForm({ redirectTo = '/', ...props }: TLoginFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -75,7 +76,7 @@ export function LoginForm({ ...props }: TLoginFormProps) {
       if (result.success) {
         toast.success(result.message)
         form.reset()
-        router.replace('/')
+        router.replace(redirectTo)
         return
       }
 
@@ -107,69 +108,57 @@ export function LoginForm({ ...props }: TLoginFormProps) {
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            <Controller
+            <FormController
               name="email"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Email <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldDescription>
-                      Enter your email address
-                    </FieldDescription>
-                  </FieldContent>
-                  <Input
-                    {...field}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="jon@example.com"
-                    autoComplete="on"
-                    className="h-9 max-w-md"
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+              orientation="responsive"
+              label={
+                <>
+                  Email <span className="text-destructive">*</span>
+                </>
+              }
+              description="Enter your email address"
+            >
+              {(field, fieldState) => (
+                <Input
+                  {...field}
+                  id={field.name}
+                  aria-invalid={fieldState.invalid}
+                  placeholder="jon@example.com"
+                  autoComplete="on"
+                  className="h-9 max-w-md"
+                />
               )}
-            />
-            <Controller
+            </FormController>
+            <FormController
               name="password"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
+              orientation="responsive"
+              label={
+                <>
+                  Password <span className="text-destructive">*</span>
+                </>
+              }
+              labelAction={
+                <Link
+                  href="/forgot-password"
+                  className="inline-block text-sm underline-offset-4 hover:underline"
                 >
-                  <FieldContent className="flex flex-row items-center justify-between">
-                    <FieldLabel htmlFor={field.name}>
-                      Password <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <Link
-                      href="/forgot-password"
-                      className="inline-block text-sm underline-offset-4 hover:underline"
-                    >
-                      Forgot your password?
-                    </Link>
-                  </FieldContent>
-                  <PasswordInput
-                    {...field}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="********"
-                    autoComplete="on"
-                    className="h-9 max-w-md"
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+                  Forgot your password?
+                </Link>
+              }
+            >
+              {(field, fieldState) => (
+                <PasswordInput
+                  {...field}
+                  id={field.name}
+                  aria-invalid={fieldState.invalid}
+                  placeholder="********"
+                  autoComplete="on"
+                  className="h-9 max-w-md"
+                />
               )}
-            />
+            </FormController>
             <Field>
               <Button
                 type="submit"

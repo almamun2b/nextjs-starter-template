@@ -1,57 +1,79 @@
 import { type ReactNode } from 'react'
 import { type SortOrder } from '@/types/response.types'
 
-export interface Column<TData> {
+export type TSortOrder = SortOrder
+
+export type TTableColumnKind = 'data' | 'select' | 'action'
+
+export type TTableAlign = 'left' | 'center' | 'right'
+
+/**
+ * Presentation-only column metadata.
+ *
+ * Contains no functions, so it can be defined once and shared between a Server
+ * Component (skeleton) and a Client Component (live table) — which is what
+ * keeps both renderings geometrically identical and avoids layout shift.
+ */
+export interface TTableColumnMeta {
   key: string
-  header: string
-  accessorKey?: keyof TData | string
-  accessorFn?: (row: TData) => ReactNode
-  cell?: (row: TData) => ReactNode
-  enableSorting?: boolean
+  label: string
+  kind?: TTableColumnKind
+  sortable?: boolean
+  /** Feeds `<colgroup>`; omit on exactly one column to let it absorb slack. */
   width?: string
-  minWidth?: string
-  maxWidth?: string
-  className?: string
+  align?: TTableAlign
+}
+
+/** A full column definition: metadata plus the cell renderer. */
+export interface TTableColumn<TRow> extends Omit<TTableColumnMeta, 'label'> {
+  label: ReactNode
   headerClassName?: string
-  align?: 'left' | 'center' | 'right'
+  cellClassName?: string
+  render?: (row: TRow, index: number) => ReactNode
 }
 
-export interface DataTableProps<TData> {
-  columns: Column<TData>[]
-  data: TData[]
-  meta?: {
-    page: number
-    limit: number
-    total: number
-    totalPage: number
-  }
-  isLoading?: boolean
-  selection?: Set<string>
-  onSelectionChange?: (selectedIds: Set<string>) => void
-  onSort?: (key: string, order: SortOrder) => void
-  sortBy?: string
-  sortOrder?: SortOrder
-  onPageChange?: (page: number) => void
-  onPageSizeChange?: (pageSize: number) => void
-  rowKey: keyof TData | ((row: TData) => string)
-  emptyMessage?: string
-  loadingMessage?: string
-  showSelectionColumn?: boolean
+export interface TTableSortState {
+  sortBy: string | null
+  sortOrder: TSortOrder | null
+}
+
+export interface TTableChangeEvent {
+  sort: TTableSortState
+  selectedIds: string[]
+}
+
+export type TPaginationSource = 'page' | 'prev' | 'next' | 'page-size'
+
+export interface TPaginationChangeEvent {
+  page: number
+  pageSize: number
+  source: TPaginationSource
+}
+
+export type TPaginationItem = number | 'ellipsis'
+
+export interface TToolbarChangeEvent {
+  search: string
+  filters: Record<string, string | null>
+  action?: { type: 'refresh' }
+}
+
+export interface TFilterOption {
+  value: string
+  label: string
+}
+
+export interface TFilterConfig {
+  name: string
+  allLabel: string
+  options: readonly TFilterOption[]
+  ariaLabel?: string
   className?: string
 }
 
-export interface TablePaginationProps {
-  meta: {
-    page: number
-    limit: number
-    total: number
-    totalPage: number
-  }
-  selectedCount?: number
-  onPageChange: (page: number) => void
-  onPageSizeChange: (pageSize: number) => void
-  pageSizeOptions?: number[]
-  className?: string
+export interface TBulkAction {
+  id: string
+  label: string
+  icon?: ReactNode
+  variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'destructive'
 }
-
-export type { SortOrder }

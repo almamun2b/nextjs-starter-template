@@ -16,28 +16,17 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { getUserDisplayName, getUserInitials } from '@/lib/user-format'
 import { useAuth } from '@/providers/auth-provider'
-import type { IUser } from '@/types/user.types'
-import { ChevronsUpDownIcon, LogOutIcon } from 'lucide-react'
+import {
+  ChevronsUpDownIcon,
+  KeyRoundIcon,
+  LogOutIcon,
+  UserIcon,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useTransition } from 'react'
-
-function getInitials(user: IUser | null): string {
-  if (!user) return 'U'
-  if (user.firstName && user.lastName) {
-    return (user.firstName[0] + user.lastName[0]).toUpperCase()
-  }
-  return user.email[0].toUpperCase()
-}
-
-function getDisplayName(user: IUser | null): string {
-  if (!user) return 'User'
-  if (user.firstName && user.lastName) {
-    return `${user.firstName} ${user.lastName}`
-  }
-  if (user.firstName) return user.firstName
-  return user.email.split('@')[0]
-}
 
 export function NavUser() {
   const { user } = useAuth()
@@ -45,8 +34,8 @@ export function NavUser() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const initials = getInitials(user)
-  const displayName = getDisplayName(user)
+  const initials = user ? getUserInitials(user) : 'U'
+  const displayName = user ? getUserDisplayName(user) : 'User'
   const email = user?.email ?? ''
   const avatarUrl = user?.avatar?.url ?? null
 
@@ -72,11 +61,9 @@ export function NavUser() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                <AvatarFallback className="rounded-lg">
-                  {initials}
-                </AvatarFallback>
+              <Avatar>
+                {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{displayName}</span>
@@ -86,20 +73,16 @@ export function NavUser() {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-fit"
+            className="w-56"
             side={isMobile ? 'bottom' : 'top'}
             align="end"
             sideOffset={4}
           >
             <DropdownMenuLabel className="p-0 font-normal text-foreground">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  {avatarUrl && (
-                    <AvatarImage src={avatarUrl} alt={displayName} />
-                  )}
-                  <AvatarFallback className="rounded-lg">
-                    {initials}
-                  </AvatarFallback>
+                <Avatar>
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+                  <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{displayName}</span>
@@ -107,6 +90,19 @@ export function NavUser() {
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/profile">
+                <UserIcon />
+                Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/change-password">
+                <KeyRoundIcon />
+                Change password
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} disabled={isPending}>
               <LogOutIcon />

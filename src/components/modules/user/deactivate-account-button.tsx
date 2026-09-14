@@ -48,78 +48,74 @@ export function DeactivateAccountButton() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <Card className="border-destructive/30">
-        <CardHeader>
-          <div className="flex items-start gap-4">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-              <ShieldOff className="size-5 text-destructive" />
-            </div>
-            <div>
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
-              <CardDescription>
-                Permanent actions that affect your account access
-              </CardDescription>
-            </div>
+    <Card className="border-destructive/30">
+      <CardHeader>
+        <div className="flex items-start gap-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+            <ShieldOff className="size-5 text-destructive" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Deactivate your account</p>
-              <p className="text-xs text-muted-foreground">
-                You will lose access to the dashboard until an admin reactivates
-                your account
-              </p>
-            </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" className="shrink-0">
-                  Deactivate
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogMedia>
-                    <AlertTriangle className="size-5 text-destructive" />
-                  </AlertDialogMedia>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will deactivate your account and:
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <ul className="-mt-2 space-y-2 px-6 text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1.5 block size-1 shrink-0 rounded-full bg-muted-foreground/50" />
-                    You won&apos;t be able to access the dashboard or any
-                    authenticated pages
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1.5 block size-1 shrink-0 rounded-full bg-muted-foreground/50" />
-                    Your profile and data will be preserved
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1.5 block size-1 shrink-0 rounded-full bg-muted-foreground/50" />
-                    An administrator can reactivate your account at any time
-                  </li>
-                </ul>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={handleDeactivate}
-                    disabled={isPending}
-                  >
-                    {isPending
-                      ? 'Deactivating...'
-                      : 'Yes, deactivate my account'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+          <div>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardDescription>
+              Permanent actions that affect your account access
+            </CardDescription>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Deactivate your account</p>
+            <p className="text-xs text-muted-foreground">
+              You will lose access to the dashboard until an admin reactivates
+              your account
+            </p>
+          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="shrink-0">
+                Deactivate
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogMedia>
+                  <AlertTriangle className="size-5 text-destructive" />
+                </AlertDialogMedia>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will deactivate your account and:
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <ul className="-mt-2 space-y-2 px-6 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 block size-1 shrink-0 rounded-full bg-muted-foreground/50" />
+                  You won&apos;t be able to access the dashboard or any
+                  authenticated pages
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 block size-1 shrink-0 rounded-full bg-muted-foreground/50" />
+                  Your profile and data will be preserved
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 block size-1 shrink-0 rounded-full bg-muted-foreground/50" />
+                  An administrator can reactivate your account at any time
+                </li>
+              </ul>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={handleDeactivate}
+                  disabled={isPending}
+                >
+                  {isPending ? 'Deactivating...' : 'Yes, deactivate my account'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

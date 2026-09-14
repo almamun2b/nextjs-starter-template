@@ -3,6 +3,15 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  experimental: {
+    // Avatar uploads go through a Server Action; Next rejects request bodies
+    // over 1 MB by default, before the action body ever runs.
+    serverActions: { bodySizeLimit: '4mb' },
+    // Required for `forbidden()` / `unauthorized()` and the matching
+    // `forbidden.tsx` / `unauthorized.tsx` conventions, which the RBAC guards
+    // in `src/lib/auth/dal.ts` use to deny access with a real 403/401 status.
+    authInterrupts: true,
+  },
   async rewrites() {
     return [
       {

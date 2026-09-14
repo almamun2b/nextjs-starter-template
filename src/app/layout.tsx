@@ -1,5 +1,6 @@
-import { me } from '@/app/actions/user'
+import { getCurrentUser } from '@/lib/auth/dal'
 import { AuthProvider } from '@/providers/auth-provider'
+import { ThemeProvider } from '@/providers/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { Metadata } from 'next'
 import { Geist_Mono, Roboto } from 'next/font/google'
@@ -13,7 +14,7 @@ const robotoSans = Roboto({
 })
 
 const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+  variable: '--font-mono',
   subsets: ['latin'],
 })
 
@@ -27,19 +28,27 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const userResult = await me().catch(() => null)
-  const user = userResult?.success && userResult.data ? userResult.data : null
+  // Memoized in the DAL, so this render's guards reuse the same profile read.
+  const user = await getCurrentUser()
 
   return (
     <html
       lang="en"
       className={`${robotoSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
-        <TooltipProvider>
-          <AuthProvider initialUser={user}>{children}</AuthProvider>
-        </TooltipProvider>
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <TooltipProvider>
+            <AuthProvider initialUser={user}>{children}</AuthProvider>
+          </TooltipProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

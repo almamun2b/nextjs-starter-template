@@ -2,6 +2,7 @@
 
 import { forgotPassword } from '@/app/actions/auth'
 import { ForgotPasswordEmailSend } from '@/components/modules/auth/forgot-password-email-send'
+import { FormController } from '@/components/shared/FormController'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -10,21 +11,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
+import { Field, FieldDescription, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { isFormInputField } from '@/lib/form'
 import { TForgotPasswordForm } from '@/types/auth.types'
 import { forgotPasswordSchema } from '@/validation/auth.validation'
 import { zodResolver } from '@hookform/resolvers/zod'
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 type TForgotPasswordFormProps = React.ComponentProps<'div'>
@@ -78,36 +73,28 @@ export function ForgotPasswordForm({ ...props }: TForgotPasswordFormProps) {
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            <Controller
+            <FormController
               name="email"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field
-                  data-invalid={fieldState.invalid}
-                  orientation="responsive"
-                >
-                  <FieldContent className="flex flex-col gap-1">
-                    <FieldLabel htmlFor={field.name}>
-                      Email <span className="text-destructive">*</span>
-                    </FieldLabel>
-                    <FieldDescription>
-                      Enter your email address
-                    </FieldDescription>
-                  </FieldContent>
-                  <Input
-                    {...field}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="jon@example.com"
-                    autoComplete="on"
-                    className="h-9 max-w-md"
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
+              orientation="responsive"
+              label={
+                <>
+                  Email <span className="text-destructive">*</span>
+                </>
+              }
+              description="Enter your email address"
+            >
+              {(field, fieldState) => (
+                <Input
+                  {...field}
+                  id={field.name}
+                  aria-invalid={fieldState.invalid}
+                  placeholder="jon@example.com"
+                  autoComplete="on"
+                  className="h-9 max-w-md"
+                />
               )}
-            />
+            </FormController>
             <Field>
               <Button
                 type="submit"
@@ -125,6 +112,14 @@ export function ForgotPasswordForm({ ...props }: TForgotPasswordFormProps) {
                   ? 'Sending...'
                   : 'Send Reset Link'}
               </Button>
+              <FieldDescription className="text-center">
+                <Link
+                  href="/login"
+                  className="underline-offset-4 hover:underline"
+                >
+                  Back to login
+                </Link>
+              </FieldDescription>
             </Field>
           </FieldGroup>
         </form>

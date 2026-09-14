@@ -38,4 +38,45 @@ const localToUtc = (input: Date | string): string => {
   return date.toISOString()
 }
 
-export const date = { utcToLocal, localToUtc }
+/**
+ * Format for display, falling back to an em dash for null/invalid input.
+ *
+ * @param input - A Date, date string, or null
+ * @param formatStr - date-fns format string
+ * @returns Formatted date, or "—"
+ */
+const formatOrDash = (
+  input: Date | string | null | undefined,
+  formatStr: string = 'MMM dd, yyyy'
+): string => {
+  if (!input) return '—'
+  try {
+    return utcToLocal(input, formatStr)
+  } catch {
+    return '—'
+  }
+}
+
+/**
+ * Convert a date into the `yyyy-MM-dd` value an `<input type="date">` expects.
+ *
+ * Uses local date parts rather than `toISOString()`, which would shift to UTC
+ * first — for a user east of UTC that renders 1990-01-01 as 1989-12-31 and
+ * round-trips the wrong date on save.
+ *
+ * @param input - A Date, date string, or null
+ * @returns `yyyy-MM-dd`, or an empty string when absent/invalid
+ */
+const toDateInputValue = (input: Date | string | null | undefined): string => {
+  if (!input) return ''
+  const parsed = typeof input === 'string' ? new Date(input) : input
+  if (Number.isNaN(parsed.getTime())) return ''
+
+  const year = String(parsed.getFullYear()).padStart(4, '0')
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+export const date = { utcToLocal, localToUtc, formatOrDash, toDateInputValue }

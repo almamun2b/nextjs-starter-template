@@ -17,7 +17,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Environment
 
-- Copy `.env.example` to `.env` and set `NEXT_PUBLIC_API_URL` (default `http://localhost:5000`) and `NEXT_PUBLIC_SITE_URL` (default `http://localhost:3000`).
+- Copy `.env.example` to `.env` and set `NEXT_PUBLIC_API_URL` (default `http://localhost:5000`), `NEXT_PUBLIC_SITE_URL` (default `http://localhost:3000`), and `ACCESS_TOKEN_SECRET` (must match the backend's signing secret — the proxy reads the role claim with it).
 - `$fetch` talks to `${NEXT_PUBLIC_API_URL}/api/v1` directly; the `/server/:path*` rewrite in `next.config.ts` also maps to it.
 - `.env` is gitignored — never commit secrets. `.env.example` is the source of truth for required vars.
 
@@ -44,6 +44,8 @@ No test runner is installed — do not assume a test command exists.
 
 ## Architecture notes
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture — auth/cookie/refresh flow, component layering (`ui/` vs `shared/` vs `modules/` vs route-scoped `_components`/`_lib`), Server Action + cache-tag conventions, and a worked example (the Users feature). The points below are the quick-reference summary.
+
 - Route groups: `(public)/` home, `(auth)/` login/signup/forgot-password/reset-password/verify-email, `(dashboard)/` dashboard/profile/settings/users/change-password with sidebar. No `src/app/api/` routes exist — all data goes to the backend via `$fetch`.
 - Server Actions live in `src/app/actions/` — default place for auth mutations and backend calls from forms.
 - Client-side data fetching goes through the shared fetch layer in `src/lib/`.
@@ -58,6 +60,35 @@ No test runner is installed — do not assume a test command exists.
 - Server Actions use `$fetch.post<T>()` patterns (not raw `fetch`) and call `revalidateTag(CACHE_TAGS.PROFILE, 'max')` with tags from `src/constant/tags.ts`.
 - Client async state: prefer `useFetch` hook from `src/lib/fetch/use-fetch.ts` over custom loading/error logic.
 - Server Action error handling: `handleFetchError` from `src/lib/error.ts` normalizes failures to `T | IErrorResponse`;
+
+## Authorization (RBAC)
+
+Read the [Authorization section in ARCHITECTURE.md](ARCHITECTURE.md#authorization-rbac)
+before touching anything permission-related. The short version:
+
+- Permissions live in `src/constant/permissions.ts` as a closed `TPermission`
+  union plus an explicit `ROLE_PERMISSIONS` table. **Add the permission there
+  first** — never inline a role comparison like `role === 'ADMIN'`.
+- Pure checks (`can`, `canActOnUser`, `explainDenial`, `assignableRoles`) are in
+  `src/lib/auth/permissions.ts` and are safe to import from both server and
+  client. Server guards (`verifySession`, `requirePermission`,
+  `requireCanActOnUser`) are in `src/lib/auth/dal.ts` and are `server-only`.
+- **Every new Server Action starts with a guard.** Actions are independent POST
+  entry points; a page-level check does not cover them. Use
+  `requireCanActOnUser(id, …)` whenever the action names a target user.
+- New protected pages call `requirePermission(...)` in the **page**, not in a
+  layout — layouts don't re-run on client-side navigation.
+- New protected routes need an entry in `src/lib/auth/route-policy.ts` and, if
+  they get a nav link, the matching `permission` on the sidebar item.
+- Client-side, use `<Can>` / `useAuth().can` for visibility only. Hiding a
+  control is not authorization.
+- `UserRole` is a numeric TS enum while the API sends string keys — always read
+  it via `readUserRole()` from `src/lib/user-format.ts`.
+- `experimental.authInterrupts` is enabled in `next.config.ts` so guards can
+  call `forbidden()` / `unauthorized()`; don't remove it.
+- `src/lib/session.ts` and `src/lib/session2.ts` are unused reference files kept
+  on purpose. Don't import them and don't delete them — use
+  `getCurrentUser()` from `src/lib/auth/dal.ts` instead.
 
 ## Forms, validation, and types
 
@@ -81,6 +112,15 @@ No test runner is installed — do not assume a test command exists.
 - Path alias `@/*` maps to `src/*`.
 - Use `cn()` from `src/lib/utils.ts` for className composition.
 - Keep Tailwind classes organized; no ad hoc styling.
+
+## File and function size
+
+Guidelines for new or heavily-edited code, not a retroactive requirement — several existing feature components predate this and are not being mass-refactored to comply:
+
+- Components/modules: soft cap **150 lines** per file. Past that, split by responsibility (e.g. extract a dialog, a sub-list, or a `_lib` helper) rather than growing one file — this repo's convention is already one dialog/view per file (see `users/_components/dialogs/`).
+- Functions: soft cap **100 lines**. If a function needs more, it's usually doing more than one job — extract the validation, mapping, or side-effect step into its own named function.
+- `src/components/ui/` (shadcn/ui primitives) is vendor code and exempt from both limits — don't split or trim it to hit a target.
+- These are advisory (not enforced by `pnpm lint`); if you want them enforced, ESLint's `max-lines` / `max-lines-per-function` rules are the natural fit, but turning them on will immediately flag existing files — treat that as a separate, deliberate decision, not a side effect of a docs change.
 
 ## Pre-commit flow
 
