@@ -37,7 +37,10 @@ export function DataTableHeader<TRow>({
   hasSelectableRows,
 }: DataTableHeaderProps<TRow>) {
   return (
-    <UiTableHeader className="sticky top-0 z-10 bg-card">
+    // Not `sticky`: the table sits in the `overflow-x-auto` wrapper from
+    // `ui/table`, which is its nearest scroll container, so a sticky header
+    // could never pin to the page — it only scrolled over the dashboard header.
+    <UiTableHeader className="bg-card">
       <UiTableRow className="hover:bg-transparent">
         {columns.map((column) => {
           const align = alignClass[column.align ?? 'left']
