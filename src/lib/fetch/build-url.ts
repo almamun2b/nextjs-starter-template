@@ -52,9 +52,16 @@ export function buildUrl(
     return fullUrl
   }
 
-  const splitIndex = fullUrl.indexOf('?')
-  const pathPart = splitIndex === -1 ? fullUrl : fullUrl.slice(0, splitIndex)
-  const existingQuery = splitIndex === -1 ? '' : fullUrl.slice(splitIndex + 1)
+  // Query params belong before any `#fragment`, not after it.
+  const hashIndex = fullUrl.indexOf('#')
+  const hash = hashIndex === -1 ? '' : fullUrl.slice(hashIndex)
+  const withoutHash = hashIndex === -1 ? fullUrl : fullUrl.slice(0, hashIndex)
+
+  const splitIndex = withoutHash.indexOf('?')
+  const pathPart =
+    splitIndex === -1 ? withoutHash : withoutHash.slice(0, splitIndex)
+  const existingQuery =
+    splitIndex === -1 ? '' : withoutHash.slice(splitIndex + 1)
   const mergedParams = new URLSearchParams(existingQuery)
 
   for (const [key, value] of searchParams.entries()) {
@@ -62,5 +69,5 @@ export function buildUrl(
   }
 
   const queryString = mergedParams.toString()
-  return queryString ? `${pathPart}?${queryString}` : pathPart
+  return `${queryString ? `${pathPart}?${queryString}` : pathPart}${hash}`
 }

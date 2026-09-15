@@ -79,6 +79,7 @@ export function VerifyEmailForm({ email, ...props }: TVerifyEmailFormProps) {
           restart()
           return
         }
+        toast.error(result.message)
       } catch (error) {
         const err = error as Error
         toast.error(err.message || 'Failed to resend verification code')

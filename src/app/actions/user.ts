@@ -8,10 +8,11 @@ import {
   requireAssignableRole,
   requireCanActOnUser,
   requirePermission,
+  userEndpoint,
 } from '@/lib/auth/dal'
 import { handleFetchError } from '@/lib/error'
 import { readUserRole } from '@/lib/user-format'
-import { IErrorResponse, IResponse } from '@/types/response.types'
+import type { IErrorResponse, IResponse } from '@/types/response.types'
 import type {
   TChangePasswordInput,
   TCreateUserInput,
@@ -25,24 +26,40 @@ import type {
   TUsersResponse,
   UpdateAvatarInput,
 } from '@/types/user.types'
-import { revalidateTag } from 'next/cache'
+import { updateTag } from 'next/cache'
+
+/*
+ * Reads (`getAllUsers`, `getUserById`, `me`) throw on failure so the calling
+ * Server Component decides what to render. Mutations return
+ * `T | IErrorResponse` — see `src/lib/error.ts` for why they never throw.
+ *
+ * `updateTag` (not `revalidateTag`) because the user must see their own write
+ * on the very next render, not a stale-while-revalidate copy.
+ */
+
+/** Profile changes show up both on the profile and in the users list. */
+const updateProfileTags = (): void => {
+  updateTag(CACHE_TAGS.PROFILE)
+  updateTag(CACHE_TAGS.USERS)
+}
+
+const updateUserTags = (id: string): void => {
+  updateTag(CACHE_TAGS.USERS)
+  updateTag(CACHE_TAGS.USER(id))
+}
 
 const getAllUsers = async (
   params: TUserQueryOptions
 ): Promise<TUsersResponse> => {
   await requirePermission(PERMISSIONS.USERS_READ)
-  try {
-    const { data: response } = await $fetch.get<
-      TUsersResponse,
-      TUserQueryOptions
-    >('/users', {
-      params,
-      next: { tags: [CACHE_TAGS.USERS] },
-    })
-    return response
-  } catch (error) {
-    throw error
-  }
+  const { data: response } = await $fetch.get<
+    TUsersResponse,
+    TUserQueryOptions
+  >('/users', {
+    params,
+    next: { tags: [CACHE_TAGS.USERS] },
+  })
+  return response
 }
 
 const createUserManually = async (
@@ -61,7 +78,7 @@ const createUserManually = async (
       TUserResponse,
       TCreateUserInput
     >('/users', { body: data })
-    revalidateTag(CACHE_TAGS.USERS, 'max')
+    updateTag(CACHE_TAGS.USERS)
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -74,13 +91,7 @@ const createUserManually = async (
  * backend derives the subject from the cookie — and delegates to the DAL so
  * layout, pages, and guards share one memoized call per render pass.
  */
-const me = async (): Promise<TUserResponse> => {
-  try {
-    return await fetchProfile()
-  } catch (error) {
-    throw error
-  }
-}
+const me = async (): Promise<TUserResponse> => fetchProfile()
 
 const updateMyProfile = async (
   data: TUpdateProfileInput
@@ -91,8 +102,7 @@ const updateMyProfile = async (
       TUserResponse,
       TUpdateProfileInput
     >('/users/me', { body: data })
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
-    revalidateTag(CACHE_TAGS.USERS, 'max')
+    updateProfileTags()
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -118,8 +128,7 @@ const updateMyProfileWihAvatar = async (
       '/users/me/profile',
       { body: formData }
     )
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
-    revalidateTag(CACHE_TAGS.USERS, 'max')
+    updateProfileTags()
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -137,24 +146,22 @@ const updateMyAvatarOnly = async (
       '/users/me/avatar',
       { body: formData }
     )
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
-    revalidateTag(CACHE_TAGS.USERS, 'max')
+    updateProfileTags()
     return response
   } catch (error) {
     return handleFetchError(error)
   }
 }
 
-const deleteMyAvatar = async (): Promise<TUserResponse> => {
+const deleteMyAvatar = async (): Promise<TUserResponse | IErrorResponse> => {
   await requirePermission(PERMISSIONS.PROFILE_UPDATE)
   try {
     const { data: response } =
       await $fetch.delete<TUserResponse>('/users/me/avatar')
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
-    revalidateTag(CACHE_TAGS.USERS, 'max')
+    updateProfileTags()
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
@@ -163,56 +170,52 @@ const changeMyPassword = async (
 ): Promise<IResponse | IErrorResponse> => {
   await requirePermission(PERMISSIONS.PROFILE_PASSWORD)
   try {
-    const { data: response } = await $fetch.patch<IResponse>(
-      '/users/me/change-password',
-      { body: data }
-    )
+    const { data: response } = await $fetch.patch<
+      IResponse,
+      TChangePasswordInput
+    >('/users/me/change-password', { body: data })
     return response
   } catch (error) {
     return handleFetchError(error)
   }
 }
 
-const deactivateMyAccount = async (): Promise<TUserResponse> => {
+const deactivateMyAccount = async (): Promise<
+  TUserResponse | IErrorResponse
+> => {
   await requirePermission(PERMISSIONS.PROFILE_DEACTIVATE)
   try {
-    const { data: response } = await $fetch.patch<
-      TUserResponse,
-      TUpdateStatusInput
-    >('/users/me/deactivate')
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
-    revalidateTag(CACHE_TAGS.USERS, 'max')
+    const { data: response } = await $fetch.patch<TUserResponse>(
+      '/users/me/deactivate'
+    )
+    updateProfileTags()
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const reactivateMyAccount = async (): Promise<TUserResponse> => {
+const reactivateMyAccount = async (): Promise<
+  TUserResponse | IErrorResponse
+> => {
   await requirePermission(PERMISSIONS.PROFILE_DEACTIVATE)
   try {
-    const { data: response } = await $fetch.patch<
-      TUserResponse,
-      TUpdateStatusInput
-    >('/users/me/reactivate')
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
-    revalidateTag(CACHE_TAGS.USERS, 'max')
+    const { data: response } = await $fetch.patch<TUserResponse>(
+      '/users/me/reactivate'
+    )
+    updateProfileTags()
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
 const getUserById = async (id: string): Promise<TUserResponse> => {
   await requirePermission(PERMISSIONS.USERS_READ)
-  try {
-    const { data: response } = await $fetch.get<TUserResponse>(`/users/${id}`, {
-      next: { tags: [CACHE_TAGS.USERS, CACHE_TAGS.USER(id)] },
-    })
-    return response
-  } catch (error) {
-    throw error
-  }
+  const { data: response } = await $fetch.get<TUserResponse>(userEndpoint(id), {
+    next: { tags: [CACHE_TAGS.USERS, CACHE_TAGS.USER(id)] },
+  })
+  return response
 }
 
 const updateUserById = async (
@@ -224,9 +227,8 @@ const updateUserById = async (
     const { data: response } = await $fetch.patch<
       TUserResponse,
       TUpdateProfileInput
-    >(`/users/${id}`, { body: data })
-    revalidateTag(CACHE_TAGS.USERS, 'max')
-    revalidateTag(CACHE_TAGS.USER(id), 'max')
+    >(userEndpoint(id), { body: data })
+    updateUserTags(id)
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -236,25 +238,24 @@ const updateUserById = async (
 const updateUserStatus = async (
   id: string,
   data: TUpdateStatusInput
-): Promise<TUserResponse> => {
+): Promise<TUserResponse | IErrorResponse> => {
   await requireCanActOnUser(id, PERMISSIONS.USERS_UPDATE_STATUS)
   try {
     const { data: response } = await $fetch.patch<
       TUserResponse,
       TUpdateStatusInput
-    >(`/users/${id}/status`, { body: data })
-    revalidateTag(CACHE_TAGS.USERS, 'max')
-    revalidateTag(CACHE_TAGS.USER(id), 'max')
+    >(userEndpoint(id, '/status'), { body: data })
+    updateUserTags(id)
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
 const updateUserRole = async (
   id: string,
   data: TUpdateRoleInput
-): Promise<TUserResponse> => {
+): Promise<TUserResponse | IErrorResponse> => {
   const { actor } = await requireCanActOnUser(id, PERMISSIONS.USERS_UPDATE_ROLE)
   requireAssignableRole(
     actor,
@@ -265,53 +266,54 @@ const updateUserRole = async (
     const { data: response } = await $fetch.patch<
       TUserResponse,
       TUpdateRoleInput
-    >(`/users/${id}/role`, { body: data })
-    revalidateTag(CACHE_TAGS.USERS, 'max')
-    revalidateTag(CACHE_TAGS.USER(id), 'max')
+    >(userEndpoint(id, '/role'), { body: data })
+    updateUserTags(id)
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const deleteUserSoft = async (id: string): Promise<TUserResponse> => {
+const deleteUserSoft = async (
+  id: string
+): Promise<TUserResponse | IErrorResponse> => {
   await requireCanActOnUser(id, PERMISSIONS.USERS_DELETE)
   try {
     const { data: response } = await $fetch.delete<TUserResponse>(
-      `/users/${id}`
+      userEndpoint(id)
     )
-    revalidateTag(CACHE_TAGS.USERS, 'max')
-    revalidateTag(CACHE_TAGS.USER(id), 'max')
+    updateUserTags(id)
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const deleteUserHard = async (id: string): Promise<TUserDeleteResponse> => {
+const deleteUserHard = async (
+  id: string
+): Promise<TUserDeleteResponse | IErrorResponse> => {
   await requireCanActOnUser(id, PERMISSIONS.USERS_DELETE_HARD)
   try {
     const { data: response } = await $fetch.delete<TUserDeleteResponse>(
-      `/users/${id}/hard`
+      userEndpoint(id, '/hard')
     )
-    revalidateTag(CACHE_TAGS.USERS, 'max')
-    revalidateTag(CACHE_TAGS.USER(id), 'max')
+    updateUserTags(id)
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
 /**
- * Busts the users cache tag so the next Server Component render refetches.
+ * Expires the users tag, then lets the caller `router.refresh()`.
  *
- * `router.refresh()` alone re-runs the server render but can still be served
- * the tag-cached `getAllUsers` response, which would make a manual refresh a
- * no-op. This adds no backend endpoint — it only invalidates an existing tag.
+ * Calling any Server Action that updates a tag also tells the client router
+ * to drop its cached RSC payload for the current route, so the refresh
+ * re-renders the list with fresh data. No backend endpoint is involved.
  */
 const revalidateUsers = async (): Promise<void> => {
   await requirePermission(PERMISSIONS.USERS_READ)
-  revalidateTag(CACHE_TAGS.USERS, 'max')
+  updateTag(CACHE_TAGS.USERS)
 }
 
 export {

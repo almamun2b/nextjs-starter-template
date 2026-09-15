@@ -10,8 +10,10 @@ import {
   type TActor,
 } from '@/lib/auth/permissions'
 import type { TUserRoleValue } from '@/lib/user-format'
+import { isHttpError } from '@/lib/fetch'
 import type { IUser, TUserResponse } from '@/types/user.types'
-import { forbidden, redirect } from 'next/navigation'
+import { userIdSchema } from '@/validation/user.validation'
+import { forbidden, notFound, redirect } from 'next/navigation'
 import { cache } from 'react'
 
 /*
@@ -36,6 +38,15 @@ import { cache } from 'react'
  * ---------------------------------------------------------------------------
  */
 
+/**
+ * `/users/:id` with the id validated and encoded. A malformed id is treated
+ * as a user that does not exist.
+ */
+const userEndpoint = (id: string, suffix = ''): string => {
+  if (!userIdSchema.safeParse(id).success) notFound()
+  return `/users/${encodeURIComponent(id)}${suffix}`
+}
+
 /** Raw `/users/me` response. Callers usually want `getCurrentUser` instead. */
 const fetchProfile = cache(async (): Promise<TUserResponse> => {
   const { data } = await $fetch.get<TUserResponse>('/users/me', {
@@ -53,32 +64,59 @@ const fetchProfile = cache(async (): Promise<TUserResponse> => {
  * guarded read is `getUserById` in `src/app/actions/user.ts`.
  */
 const fetchUserRecord = cache(async (id: string): Promise<IUser> => {
-  const { data } = await $fetch.get<TUserResponse>(`/users/${id}`, {
+  const { data } = await $fetch.get<TUserResponse>(userEndpoint(id), {
     next: { tags: [CACHE_TAGS.USERS, CACHE_TAGS.USER(id)] },
   })
   return data.data
 })
 
+type TSessionRead =
+  | { status: 'signed-in'; user: IUser }
+  | { status: 'signed-out' }
+  | { status: 'unavailable'; error: unknown }
+
 /**
- * The signed-in user, or `null` when there is no usable session.
- *
- * Never throws — a failed profile read is treated as "signed out" so callers
- * can branch on it. Use `verifySession()` when absence should redirect.
+ * One profile read, classified. Only a 401/403 from the backend means
+ * "signed out"; a timeout, outage, or 5xx is `unavailable` — the session may
+ * be perfectly valid, we just can't confirm it right now.
  */
-const getCurrentUser = cache(async (): Promise<IUser | null> => {
+const readSession = cache(async (): Promise<TSessionRead> => {
   try {
     const response = await fetchProfile()
-    return response.success && response.data ? response.data : null
-  } catch {
-    return null
+    return response.success && response.data
+      ? { status: 'signed-in', user: response.data }
+      : { status: 'signed-out' }
+  } catch (error) {
+    if (isHttpError(error) && (error.status === 401 || error.status === 403)) {
+      return { status: 'signed-out' }
+    }
+    return { status: 'unavailable', error }
   }
 })
 
-/** The signed-in user, redirecting to `/login` when there is none. */
+/**
+ * The signed-in user, or `null` when there is none *or it can't be confirmed*.
+ *
+ * Best effort, never throws — for display only (root layout, header), so an
+ * API outage doesn't take down public pages. Guards use `verifySession()`.
+ */
+const getCurrentUser = cache(async (): Promise<IUser | null> => {
+  const session = await readSession()
+  return session.status === 'signed-in' ? session.user : null
+})
+
+/**
+ * The signed-in user, redirecting to `/login` when there is none.
+ *
+ * An unavailable backend is rethrown for the nearest `error.tsx` instead of
+ * redirecting: the proxy still sees a valid token and would send `/login`
+ * straight back here, looping until the browser gives up.
+ */
 const verifySession = async (): Promise<IUser> => {
-  const user = await getCurrentUser()
-  if (!user) redirect('/login')
-  return user
+  const session = await readSession()
+  if (session.status === 'unavailable') throw session.error
+  if (session.status === 'signed-out') redirect('/login')
+  return session.user
 }
 
 /**
@@ -141,5 +179,6 @@ export {
   requireAssignableRole,
   requireCanActOnUser,
   requirePermission,
+  userEndpoint,
   verifySession,
 }

@@ -1,3 +1,4 @@
+import { getAccessTokenSecret } from '@/env'
 import jwt, { type JwtPayload } from 'jsonwebtoken'
 
 /*
@@ -16,8 +17,6 @@ import jwt, { type JwtPayload } from 'jsonwebtoken'
  * ---------------------------------------------------------------------------
  */
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'secret'
-
 /**
  * `userId` / `email` / `role` come from the module augmentation in
  * `src/types/global.d.ts`, which is the single declaration of what the backend
@@ -34,8 +33,11 @@ type TVerifyResult =
 const verifyAccessToken = (token: string | undefined | null): TVerifyResult => {
   if (!token) return { status: 'invalid' }
 
+  // Outside the try: a missing secret is a deployment error, not a bad token.
+  const secret = getAccessTokenSecret()
+
   try {
-    const payload = jwt.verify(token, ACCESS_TOKEN_SECRET)
+    const payload = jwt.verify(token, secret)
     if (!payload || typeof payload === 'string') {
       return { status: 'invalid' }
     }

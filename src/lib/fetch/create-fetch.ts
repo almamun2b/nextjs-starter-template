@@ -24,9 +24,8 @@ import type {
  * import { createFetch } from '@/lib/fetch'
  *
  * export const $fetch = createFetch({
- *   baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`,
- *   headers: { 'Content-Type': 'application/json' },
- *   credentials: 'include',
+ *   baseUrl: 'https://api.example.com/api/v1',
+ *   timeout: 10_000,
  *   onRequest: async (req) => {
  *     const cookieStore = await cookies()
  *     const cookieString = cookieStore.toString()

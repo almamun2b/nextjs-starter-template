@@ -25,6 +25,37 @@ export type QueryParams = Record<string, QueryParamValue>
 export type FetchBody = BodyInit | Record<string, unknown> | unknown[] | null
 
 /**
+ * How `$fetch` reads the response body. `auto` picks by `Content-Type`; use an
+ * explicit type for binary payloads (`blob`, `arrayBuffer`) or to consume the
+ * raw `ReadableStream` yourself (`stream`).
+ */
+export type ResponseType =
+  | 'auto'
+  | 'json'
+  | 'text'
+  | 'blob'
+  | 'arrayBuffer'
+  | 'stream'
+
+/**
+ * Automatic retry policy. Off by default (`attempts: 0`). Only failures that
+ * are safe to replay are retried: idempotent `methods`, and either a
+ * `network`/`timeout` error or one of `statusCodes`.
+ */
+export interface RetryOptions {
+  /** Extra attempts after the first one. Default `0`. */
+  attempts?: number
+  /** Upper-case methods that may be retried. Default `['GET', 'HEAD', 'OPTIONS']`. */
+  methods?: string[]
+  /** HTTP statuses that may be retried. Default `[408, 429, 502, 503, 504]`. */
+  statusCodes?: number[]
+  /** First backoff step; doubles each attempt, with jitter. Default `250`. */
+  baseDelayMs?: number
+  /** Longest wait between attempts; a longer `Retry-After` stops retrying. Default `3000`. */
+  maxDelayMs?: number
+}
+
+/**
  * Next.js-specific fetch cache/tagging options, mirrored from the extended
  * `RequestInit` that Next.js's `fetch` accepts on the server.
  */
@@ -55,7 +86,7 @@ export interface RequestContext {
 export interface FetchResponse<TResponse = unknown> {
   /** Parsed response body (JSON-parsed, text, or FormData depending on Content-Type). */
   data: TResponse
-  /** The raw, untouched `Response` object returned by the native `fetch`. */
+  /** The `Response` returned by the native `fetch`. Its body has already been read into `data`. */
   response: Response
   status: number
   statusText: string
@@ -90,21 +121,46 @@ export type OnSuccessHook<TResponse = unknown> = (
 ) => FetchResponse<TResponse> | Promise<FetchResponse<TResponse>>
 
 /**
- * Called whenever a request fails — either a network-level failure (e.g.
- * DNS/abort, in which case `error` is the native thrown error/`TypeError`)
- * or an HTTP-level failure (`response.ok === false`, in which case `error`
- * is a {@link FetchError} carrying the parsed response).
+ * Called whenever a request fails, after any automatic retries. `error` is a
+ * `FetchError` for every failure `$fetch` itself detects — check its `kind`
+ * (`http`, `network`, `timeout`, `abort`, `parse`). Errors thrown by your own
+ * `onRequest`/`onResponse` hooks arrive unchanged.
  *
  * Return a value to have `$fetch` resolve with that value instead of
  * throwing (recovery), or return `undefined`/rethrow to propagate the error.
+ *
+ * The optional second argument exposes the failed request and a one-shot
+ * `retry` (see {@link ErrorContext}), e.g. to re-send after refreshing auth.
  */
-export type OnErrorHook = (error: unknown) => unknown | Promise<unknown>
+export type OnErrorHook = (
+  error: unknown,
+  context: ErrorContext
+) => unknown | Promise<unknown>
+
+/**
+ * Passed to {@link OnErrorHook} alongside the error.
+ */
+export interface ErrorContext {
+  /** The request exactly as it was sent (after `onRequest`). */
+  request: RequestContext
+  /**
+   * Re-sends the same request. `init` is shallow-merged over the original
+   * `RequestInit`, with `headers` merged per-key. The retry runs `onResponse`,
+   * the automatic retry policy, and `onSuccess`, but never `onError` again, so
+   * it cannot recurse — a failed retry throws a `FetchError`. A
+   * `ReadableStream` body cannot be replayed.
+   */
+  retry: <TResponse = unknown>(
+    init?: RequestInit
+  ) => Promise<FetchResponse<TResponse>>
+}
 
 /**
  * Lifecycle hooks shared by both a single `$fetch` call and an
  * `createFetch`-created instance. Instance-level and call-level hooks are
- * composed (instance hook runs first) except for `onError`, where a
- * call-level hook fully overrides the instance-level one.
+ * composed: `onRequest`/`onResponse`/`onSuccess` run instance-first;
+ * `onError` runs call-level first and falls through to the instance hook when
+ * the call-level one returns `undefined` or rethrows the same error.
  */
 export interface FetchHooks<TResponse = unknown> {
   onRequest?: OnRequestHook
@@ -142,6 +198,15 @@ export interface FetchConfig<
   body?: TBody | BodyInit | null
   /** Next.js server-side cache/revalidation options. */
   next?: NextFetchRequestConfig
+  /**
+   * Milliseconds before the attempt is aborted with a `timeout` `FetchError`.
+   * Covers the response body too. Applies per attempt. Default: no timeout.
+   */
+  timeout?: number
+  /** Automatic retry policy; a number is shorthand for `{ attempts }`. See {@link RetryOptions}. */
+  retry?: number | RetryOptions
+  /** How to read the response body. Default `'auto'`. See {@link ResponseType}. */
+  responseType?: ResponseType
 }
 
 /**
