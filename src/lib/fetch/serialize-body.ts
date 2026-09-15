@@ -33,8 +33,10 @@ function isPlainSerializable(
  * - `string` → passed through as-is.
  * - Native `BodyInit` values (FormData, Blob, ArrayBuffer, typed arrays,
  *   URLSearchParams, ReadableStream) → passed through untouched, and no
- *   `Content-Type` is set (left to the runtime, important for correct
- *   multipart boundaries).
+ *   `Content-Type` is set (left to the runtime).
+ * - `FormData` → any caller-provided `Content-Type` is *removed*: only the
+ *   runtime knows the multipart boundary, so a preset header (for example an
+ *   instance-wide `application/json` default) would make the body unreadable.
  * - Plain objects/arrays → `JSON.stringify`-ed, and `Content-Type:
  *   application/json` is set unless the caller already provided one.
  *
@@ -59,6 +61,10 @@ export function serializeBody(
       headers.set('Content-Type', 'application/json')
     }
     return { body: JSON.stringify(body), headers }
+  }
+
+  if (body instanceof FormData) {
+    headers.delete('Content-Type')
   }
 
   return { body: body as BodyInit, headers }

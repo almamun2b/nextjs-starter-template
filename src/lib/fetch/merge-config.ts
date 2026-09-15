@@ -1,4 +1,4 @@
-import type { FetchConfig, QueryParams } from './types'
+import type { FetchConfig, OnErrorHook, QueryParams } from './types'
 
 /** Merges two `HeadersInit` values, with `override` entries winning per-key. */
 function mergeHeaders(base?: HeadersInit, override?: HeadersInit): Headers {
@@ -34,6 +34,36 @@ function composeHooks<T extends (...args: never[]) => unknown>(
 }
 
 /**
+ * Chains two `onError` hooks: `override` (call-level) runs first. If it
+ * recovers (returns a value) or throws a *different* error, that wins;
+ * otherwise — it returned `undefined` or rethrew the same error — `base`
+ * (instance-level, e.g. silent token refresh) still gets its turn.
+ */
+function composeErrorHooks(
+  base?: OnErrorHook,
+  override?: OnErrorHook
+): OnErrorHook | undefined {
+  if (!base) return override
+  if (!override) return base
+
+  return async (error, context) => {
+    try {
+      const handled = await override(error, context)
+      if (handled !== undefined) return handled
+    } catch (thrown) {
+      if (thrown !== error) throw thrown
+    }
+    return base(error, context)
+  }
+}
+
+/** Shallow-merges two optional objects, keeping `undefined` when both are absent. */
+function mergeObjects<T extends object>(base?: T, override?: T): T | undefined {
+  if (!base && !override) return undefined
+  return { ...base, ...override } as T
+}
+
+/**
  * Merges a `createFetch` instance's default {@link FetchConfig} with a
  * per-call `FetchConfig`, so the call-site can override individual options
  * without discarding the rest of the instance defaults.
@@ -41,8 +71,8 @@ function composeHooks<T extends (...args: never[]) => unknown>(
  * Merge rules:
  * - `headers`, `params`, `next`: shallow-merged (call-level wins per-key).
  * - `onRequest`, `onResponse`, `onSuccess`: composed — instance hook runs first, call-level hook runs second.
- * - `onError`: call-level fully replaces instance-level (control-flow hooks don't compose meaningfully).
- * - Everything else (`method`, `cache`, `credentials`, `signal`, `baseUrl`, ...): call-level overrides instance default.
+ * - `onError`: composed — call-level runs first, then instance-level unless the call-level hook recovered (see {@link composeErrorHooks}).
+ * - Everything else (`method`, `cache`, `signal`, `baseUrl`, `timeout`, `retry`, `responseType`, ...): call-level overrides instance default.
  *
  * Generic parameter order is always `TResponse, TBody, TParams`.
  */
@@ -82,12 +112,12 @@ export function mergeConfig<
     ...baseRest,
     ...overrideRest,
     baseUrl: overrideBaseUrl ?? baseBaseUrl,
-    params: { ...baseParams, ...overrideParams } as TParams,
-    next: { ...baseNext, ...overrideNext },
+    params: mergeObjects(baseParams, overrideParams),
+    next: mergeObjects(baseNext, overrideNext),
     headers: mergeHeaders(baseHeaders, overrideHeaders),
     onRequest: composeHooks(baseOnRequest, overrideOnRequest),
     onResponse: composeHooks(baseOnResponse, overrideOnResponse),
     onSuccess: composeHooks(baseOnSuccess, overrideOnSuccess),
-    onError: overrideOnError ?? baseOnError,
+    onError: composeErrorHooks(baseOnError, overrideOnError),
   }
 }

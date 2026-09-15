@@ -42,10 +42,10 @@ export function NavUser() {
   const handleLogout = () => {
     startTransition(async () => {
       try {
-        const result = await logoutUser()
-        if (result.success) {
-          router.push('/login')
-        }
+        // `logoutUser` clears the auth cookies even when the backend call
+        // fails, so the session is over locally either way.
+        await logoutUser()
+        router.push('/login')
       } catch (error) {
         console.error(error)
       }

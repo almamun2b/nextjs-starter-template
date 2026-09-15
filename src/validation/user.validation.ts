@@ -89,10 +89,17 @@ type TCreateUserForm = z.infer<typeof createUserSchema>
 type TUpdateUserRoleForm = z.infer<typeof updateUserRoleSchema>
 type TUpdateUserStatusForm = z.infer<typeof updateUserStatusSchema>
 
+/**
+ * Backend user ids are UUIDs. Validating before an id is interpolated into a
+ * request path keeps `..`, `?`, and `#` from re-targeting the request.
+ */
+const userIdSchema = z.string().uuid()
+
 export {
   changePasswordSchema,
   createUserSchema,
   updateUserRoleSchema,
   updateUserStatusSchema,
+  userIdSchema,
 }
 export type { TCreateUserForm, TUpdateUserRoleForm, TUpdateUserStatusForm }

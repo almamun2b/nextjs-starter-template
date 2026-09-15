@@ -42,7 +42,7 @@ export function UserDeleteDialog({
 
   const handleConfirm = () => {
     startTransition(async () => {
-      // Both delete actions throw on failure rather than returning an error union.
+      // Expected failures come back as a result; the catch covers anything else.
       try {
         const result = isHard
           ? await deleteUserHard(user.id)

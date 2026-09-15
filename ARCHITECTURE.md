@@ -11,7 +11,7 @@ This is a **frontend-only Next.js app**. There are no `src/app/api/` routes
 and no database access from this codebase — all data lives behind a separate
 backend REST API, reached in one of two equivalent ways:
 
-- Directly, via `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:5000/api/v1`).
+- Directly, via `API_BASE_URL` from [`src/env.ts`](src/env.ts) — `API_URL` (server-only) or `NEXT_PUBLIC_API_URL`, plus `/api/v1`.
 - Through the `/server/:path*` rewrite in `next.config.ts`, which proxies to
   the same backend — useful for same-origin requests from the browser.
 
@@ -38,26 +38,51 @@ forward them.
 
 2. **Cookie forwarding — `$fetch`'s `onRequest`/`onResponse` hooks.** Server
    Actions and Server Components run on the Node server, not the browser, so
-   `$fetch` manually copies the incoming request's cookies onto every
-   outgoing backend call (`onRequest`), and copies any `Set-Cookie` headers
-   the backend returns back onto the response (`onResponse`, via
-   `set-cookie-parser`). This is what makes login/logout/refresh work
-   transparently through Server Actions.
+   `$fetch` manually copies the incoming request's **auth** cookies onto every
+   outgoing backend call (`onRequest`), and copies the backend's **auth**
+   `Set-Cookie` headers back onto the response (`onResponse`, via
+   `set-cookie-parser`, with `Domain` dropped). The allowlist and the
+   Set-Cookie → Next cookie conversion live in
+   [`src/lib/auth/cookies.ts`](src/lib/auth/cookies.ts), shared with the proxy.
+   This is what makes login/logout/refresh work transparently through Server
+   Actions.
 
-3. **Silent refresh on 401 — `$fetch`'s `onError` hook.** When a backend call
-   returns 401, `$fetch` calls `/auth/refresh-token` directly (via native
-   `fetch`, not `$fetch`, to avoid recursion) using the `refreshToken`
-   cookie, forwards the new `Set-Cookie` headers, then rethrows the original
-   401 so the caller can retry. Concurrent 401s are deduplicated through a
-   single shared `refreshPromise` so simultaneous requests don't trigger
-   multiple refresh calls. **Do not duplicate this logic** — anything that
-   needs auto-refresh should go through `$fetch`.
+3. **Silent refresh — the proxy first, `$fetch` as fallback.** Both go through
+   `refreshSession()` in [`src/lib/auth/refresh.ts`](src/lib/auth/refresh.ts),
+   which POSTs `/auth/refresh-token` with native `fetch` and deduplicates
+   concurrent calls **per refresh token** (never across users).
+   - **Proxy (primary).** The backend gives the `accessToken` cookie the same
+     lifetime as the JWT, so an expired token usually arrives as _no_ token.
+     When the access token is missing, invalid, expired, or within 30s of
+     expiry and a `refreshToken` is present, the proxy refreshes before the
+     page renders, writes the new cookies onto the forwarded request (so this
+     render's `cookies()` sees them) and onto the response (so the browser
+     keeps them). This has to happen here: Server Components cannot set
+     cookies, so a refresh started mid-render never reaches the browser. A
+     rejected refresh clears both cookies; an unreachable backend leaves them
+     alone and lets the request through for the DAL to decide.
+   - **`$fetch` `onError` (fallback).** On a 401 from a non-`/auth/*` endpoint
+     it refreshes, sets the cookies where writable (Server Actions, Route
+     Handlers), and **retries the request once** with the new `Cookie` header
+     via the hook's `context.retry()`. A failed refresh rethrows the 401.
+     The `onError` hooks compose, so a call-level `onError` cannot silently
+     disable this.
+   - **Rotation caveat.** The fallback is safe during a Server Component
+     render only because the backend does not revoke the old refresh token
+     today. Before enabling rotation, add a short reuse grace window on the
+     backend — see the note in `src/lib/auth/refresh.ts`.
+     **Do not duplicate this logic** — anything that needs auto-refresh should
+     go through `$fetch`.
 
 4. **Reading the session server-side — [`src/lib/auth/dal.ts`](src/lib/auth/dal.ts).**
-   `getCurrentUser()` returns the signed-in `IUser` (or `null`) by calling
-   `/users/me` through `$fetch`, memoized with React `cache()`. It is the one
-   server-side source of session truth — the root layout, the header, and every
-   authorization guard all go through it. JWT decoding is confined to
+   One memoized `/users/me` read through `$fetch`, classified as signed-in,
+   signed-out (401/403 only), or unavailable (timeout, outage, 5xx). It is the
+   one server-side source of session truth, with two views:
+   `getCurrentUser()` is best effort (`null` unless signed in) for display —
+   the root layout and header — so an API outage doesn't break public pages;
+   `verifySession()` (and every guard built on it) redirects to `/login` only
+   when signed out and **rethrows** when unavailable. Redirecting on an outage
+   would loop: the proxy still sees a valid token and sends `/login` back. JWT decoding is confined to
    [`src/lib/auth/token.ts`](src/lib/auth/token.ts), used only by the proxy's
    optimistic check.
 
@@ -106,10 +131,12 @@ component all run the _same_ functions and cannot drift:
    redirect, so the URL is preserved and `src/app/403/page.tsx` raises the same
    `forbidden()` interrupt a page guard would. Signed-out users get
    `/login?next=<destination>`, which the login page reads back.
-   Crucially, an **expired** access token alongside a refresh token still reads
-   as signed in and skips role gating — verifying strictly here would defeat
-   `$fetch`'s silent refresh and log people out on every token rotation. It
-   never authorizes on unverified claims.
+   A missing or expired access token alongside a refresh token is refreshed
+   in the proxy before any check runs (see
+   [silent refresh](#auth-cookies-the-proxy-guard-and-silent-refresh)), so role
+   gating always runs on freshly verified claims. Only if the backend is
+   unreachable does the request pass through unfiltered for the DAL to decide.
+   It never authorizes on unverified claims.
 2. **Data Access Layer — authoritative** (`src/lib/auth/dal.ts`, `server-only`).
    `verifySession()`, `requirePermission()`, `requireCanActOnUser()`. The role
    comes from `/users/me` through `$fetch` — not from decoding the token —
@@ -138,12 +165,17 @@ Mutations live in `src/app/actions/` (`auth.ts`, `user.ts`) as `'use server'`
 functions. The shape is consistent across every action:
 
 ```ts
-const doThing = async (data: TInput): Promise<TOutput | IErrorResponse> => {
+const doThing = async (
+  id: string,
+  data: TInput
+): Promise<TOutput | IErrorResponse> => {
+  await requireCanActOnUser(id, PERMISSIONS.SOMETHING) // guard first, outside the try
   try {
-    const { data: response } = await $fetch.post<TOutput, TInput>('/path', {
-      body: data,
-    })
-    revalidateTag(CACHE_TAGS.SOMETHING, 'max')
+    const { data: response } = await $fetch.post<TOutput, TInput>(
+      userEndpoint(id, '/thing'), // validated + encoded path
+      { body: data }
+    )
+    updateTag(CACHE_TAGS.SOMETHING)
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -151,14 +183,29 @@ const doThing = async (data: TInput): Promise<TOutput | IErrorResponse> => {
 }
 ```
 
-- `handleFetchError` (`src/lib/error.ts`) normalizes a caught `FetchError`
-  into `IErrorResponse` for the caller to render inline — _unless_ it's a 401,
-  which it rethrows (401s are handled by the refresh flow above, not by
-  per-action error UI).
-- Cache tags come from `src/constant/tags.ts` (`CACHE_TAGS`). Actions that
-  change a resource revalidate its tag(s) so Server Components re-fetch
-  fresh data on next render — this is the only invalidation mechanism; there
-  is no client-side cache to sync separately.
+- **Expected failures are values, not exceptions.** Next.js hides a thrown
+  error's message in production, so a thrown "Invalid credentials" would
+  reach the form as a generic error. `handleFetchError` (`src/lib/error.ts`)
+  turns every `FetchError` into an `IErrorResponse`:
+  - HTTP errors → the backend's envelope, copied field by field (no debug
+    fields leak), or a synthesized one when the body isn't an envelope (an
+    HTML 502 page);
+  - `timeout` → 504 `UPSTREAM_TIMEOUT`, `network` → 503
+    `SERVICE_UNAVAILABLE`, `parse` → 502 `BAD_UPSTREAM_RESPONSE`.
+
+  It still throws for Next.js interrupts and non-fetch bugs, and calls
+  `unauthorized()` for a 401 from a protected endpoint (the refresh fallback
+  already failed). A 401 from `/auth/*` — wrong password, bad code — is
+  returned like any other error.
+
+- `success` is a literal (`true` on `IResponse`, `false` on
+  `IErrorResponse`), so `if (result.success)` narrows the union in forms.
+- Cache tags come from `src/constant/tags.ts` (`CACHE_TAGS`). Actions call
+  `updateTag` (read-your-own-writes; `revalidateTag` would serve stale content
+  once). Note that in Next.js 16 `fetch` isn't cached by default, so the tags
+  on `$fetch` reads don't create cache entries today; the `updateTag` call
+  still makes the action's response carry a fresh render of the current
+  route.
 
 ## Component layering
 
@@ -197,12 +244,19 @@ client and server never validate a payload differently.
 ## Data fetching
 
 - **Server-first by default.** Pages are Server Components that call
-  `$fetch` (directly or via a Server Action) and read `revalidateTag`d data.
-  This is the default path for anything that can be resolved at render time.
-- **Client-side when interaction demands it** (filters, live updates, forms
-  that need loading/error state in the UI) — use the `useFetch` hook
-  (`src/lib/fetch/use-fetch.ts`) instead of hand-rolled `useState`/`useEffect`
-  fetch logic.
+  `$fetch` (directly or via a guarded read like `getAllUsers`). This is the
+  default path for anything that can be resolved at render time — including
+  filters and pagination, which live in the URL and re-render on the server
+  (see the Users feature).
+- **Mutations from the client** go through a Server Action called inside
+  `useTransition` (or `useActionState`), branching on `result.success`. There
+  is no custom client fetch hook: Server Actions are POST-only and run one at
+  a time, so they are the wrong tool for client-side reads. If a feature
+  genuinely needs client-side reads with caching, adopt TanStack Query rather
+  than growing a hand-rolled hook.
+- **Every backend call is bounded**: 10s per attempt, one retry for
+  idempotent methods on network errors, timeouts, 408/429/502/503/504
+  (`src/lib/fetch/retry.ts`). Refresh calls from the proxy time out after 5s.
 
 ## Worked example: the Users feature
 

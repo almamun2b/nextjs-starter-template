@@ -56,8 +56,9 @@ export function UsersParamsProvider({ children }: { children: ReactNode }) {
     }
 
     /**
-     * Bust the cache tag first — `router.refresh()` alone re-runs the render
-     * but can still be handed the tag-cached `getAllUsers` response.
+     * Expire the users tag first; a Server Action that updates a tag also
+     * drops the client router's cached payload, so the refresh is never
+     * served a stale list.
      */
     const refresh = () => {
       startTransition(async () => {

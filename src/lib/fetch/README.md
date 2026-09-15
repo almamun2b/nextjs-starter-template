@@ -2,11 +2,14 @@
 
 A production-ready, type-safe fetch utility for **TypeScript + Next.js (App Router)**.
 
-It extends the native `RequestInit` interface directly, so every current and future browser/Next.js fetch option (`cache`, `credentials`, `signal`, `next.revalidate`, `next.tags`, ...) works out of the box with **zero extra code** — plus `baseUrl`, automatic query/body serialization, lifecycle hooks, and a typed error class.
+It extends the native `RequestInit` interface directly, so every current and future browser/Next.js fetch option (`cache`, `credentials`, `signal`, `next.revalidate`, `next.tags`, ...) works out of the box with **zero extra code** — plus `baseUrl`, automatic query/body serialization, timeouts, retries, lifecycle hooks, and a typed error class.
 
 ```ts
-import { $fetch, createFetch, FetchError } from '@/lib/fetch'
+import { createFetch, FetchError, isHttpError } from '@/lib/fetch'
+import { $fetch } from '@/lib/fetch/fetch' // the unconfigured core
 ```
+
+> **In this app, use the configured client** — `import { $fetch } from '@/lib/$fetch'`. It adds the backend base URL, auth cookie forwarding, silent refresh, a 10s timeout, and one retry for idempotent reads. The unconfigured core is deliberately not re-exported from `@/lib/fetch` so the two can't be confused; the examples below that use it import it from `@/lib/fetch/fetch`.
 
 ---
 
@@ -23,6 +26,7 @@ import { $fetch, createFetch, FetchError } from '@/lib/fetch'
 - [Request Body](#request-body)
 - [The Response Shape](#the-response-shape)
 - [Error Handling — `FetchError`](#error-handling--fetcherror)
+- [Timeouts, Retries & Response Types](#timeouts-retries--response-types)
 - [Lifecycle Hooks](#lifecycle-hooks)
   - [`onRequest`](#onrequest)
   - [`onResponse`](#onresponse)
@@ -31,13 +35,6 @@ import { $fetch, createFetch, FetchError } from '@/lib/fetch'
   - [Hook Composition (instance + call level)](#hook-composition-instance--call-level)
 - [Config Merge Rules](#config-merge-rules)
 - [Next.js Caching (`next.revalidate` / `next.tags`)](#nextjs-caching-nextrevalidate--nexttags)
-- [`useFetch` — React Hook for Actions & Client Calls](#usefetch--react-hook-for-actions--client-calls)
-  - [Manual trigger](#manual-trigger)
-  - [Run immediately on mount](#run-immediately-on-mount)
-  - [Passing arguments](#passing-arguments)
-  - [`onSuccess` / `onError` callbacks](#onsuccess--onerror-callbacks)
-  - [Resetting state](#resetting-state)
-  - [Using `useFetch` with the `api` client (not just Server Actions)](#using-usefetch-with-the-api-client-not-just-server-actions)
 - [Authentication with httpOnly Cookies (Access + Refresh Tokens)](#authentication-with-httponly-cookies-access--refresh-tokens)
   - [Handling HttpOnly Cookie Authentication](#handling-httponly-cookie-authentication)
   - [Server Components, Server Actions & Route Handlers (Node.js) — cookies are NOT automatic](#server-components-server-actions--route-handlers-nodejs--cookies-are-not-automatic)
@@ -60,9 +57,10 @@ lib/fetch/
 ├── fetch-error.ts
 ├── merge-config.ts
 ├── method-shorthands.ts
+├── parse-response.ts
+├── retry.ts
 ├── fetch.ts
 ├── create-fetch.ts
-├── use-fetch.ts
 └── index.ts
 ```
 
@@ -73,7 +71,7 @@ No dependencies beyond TypeScript + the native `fetch`/`Headers`/`Response` type
 ## Quick Start
 
 ```ts
-import { $fetch } from '@/lib/fetch'
+import { $fetch } from '@/lib/fetch/fetch'
 import type { TLoginInput } from '@/types/auth.types'
 import type { TUserResponse } from '@/types/user.types'
 
@@ -122,7 +120,7 @@ $fetch.post<TResponse, TBody, TParams>(url, init)
 Use this when you don't need shared defaults — every call is fully self-contained.
 
 ```ts
-import { $fetch } from '@/lib/fetch'
+import { $fetch } from '@/lib/fetch/fetch'
 import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
 
 // NOTE: use `type`, not `interface`, for params types — see callout below
@@ -318,7 +316,7 @@ await $fetch.post<unknown, TCreateUserInput>('/users', {
   body: { email: 'bob@example.com', password: 'SecurePass2!', role: 'USER' },
 })
 
-// FormData -> passed through untouched, Content-Type left alone (correct multipart boundary)
+// FormData -> passed through untouched; any preset Content-Type is removed so the runtime sets the multipart boundary
 const form = new FormData()
 form.append('avatar', file)
 await $fetch.patch('/users/me/avatar', { baseUrl, body: form })
@@ -330,7 +328,8 @@ await $fetch.post('/upload', { baseUrl, body: someBlob })
 Rules:
 
 - **Plain objects/arrays** → `JSON.stringify`-ed, and `Content-Type: application/json` is set **only if you haven't already set one**.
-- **Native `BodyInit` values** (`FormData`, `Blob`, `ArrayBuffer`, typed arrays, `URLSearchParams`, `ReadableStream`, `string`) → passed through completely untouched, with no `Content-Type` override — this matters for correct `multipart/form-data` boundaries.
+- **Native `BodyInit` values** (`FormData`, `Blob`, `ArrayBuffer`, typed arrays, `URLSearchParams`, `ReadableStream`, `string`) → passed through untouched, with no `Content-Type` added.
+- **`FormData`** → any `Content-Type` you (or an instance default) set is **removed**. Only the runtime knows the multipart boundary; a preset `application/json` would make the upload unreadable by the server. Don't set a JSON `Content-Type` as an instance default — plain-object bodies get it automatically.
 - **`null` / `undefined`** → no body sent.
 
 ---
@@ -342,7 +341,7 @@ Every successful (or hook-recovered) call resolves to a `FetchResponse<TResponse
 ```ts
 interface FetchResponse<TResponse> {
   data: TResponse // parsed body (JSON, text, or FormData depending on Content-Type)
-  response: Response // the raw, untouched Response object
+  response: Response // the native Response; its body has already been read into `data`
   status: number
   statusText: string
   ok: boolean
@@ -352,59 +351,97 @@ interface FetchResponse<TResponse> {
 ```
 
 ```ts
-const { data, status, ok, message } = await $fetch<TUsersResponse>('/users', {
+// Non-2xx responses throw a FetchError, so a resolved call is always `ok`
+const { data, status, message } = await $fetch<TUsersResponse>('/users', {
   baseUrl,
 })
-
-if (ok) {
-  console.log(data.data)
-} else {
-  console.log(status, message)
-}
 ```
 
 Response body parsing is automatic based on `Content-Type`:
 
-| Content-Type                                                | Parsed as                                             |
-| ----------------------------------------------------------- | ----------------------------------------------------- |
-| `application/json` (or unknown/missing)                     | `JSON.parse`, falls back to raw text if parsing fails |
-| `text/*`                                                    | plain text                                            |
-| `multipart/form-data` / `application/x-www-form-urlencoded` | `FormData`                                            |
-| `204` / `205` status, or `Content-Length: 0`                | `null`                                                |
+| Content-Type                                                | Parsed as (`responseType: 'auto'`, the default)                                                             |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `application/json`, `application/*+json`                    | `JSON.parse`; malformed JSON on a 2xx throws a `parse` `FetchError`, on an error response it's kept as text |
+| `text/*`                                                    | plain text                                                                                                  |
+| `multipart/form-data` / `application/x-www-form-urlencoded` | `FormData`                                                                                                  |
+| anything else / missing                                     | `JSON.parse` if it parses, otherwise raw text                                                               |
+| `204` / `205` / `304`, `Content-Length: 0`, or no body      | `null`                                                                                                      |
+
+For binary payloads pass an explicit `responseType` (`'blob'`, `'arrayBuffer'`, or `'stream'` for the raw `ReadableStream`) — `auto` decodes unknown types as text, which corrupts binary data.
 
 ---
 
 ## Error Handling — `FetchError`
 
-When the response resolves with `ok === false`, `$fetch` throws a `FetchError` carrying the full parsed response as direct properties:
+Every failure `$fetch` detects throws a `FetchError`. Its `kind` says what happened:
+
+| `kind`    | When                                                                  | `status` / `data`     |
+| --------- | --------------------------------------------------------------------- | --------------------- |
+| `http`    | a response arrived with `ok === false`                                | set from the response |
+| `network` | no usable response — DNS failure, refused connection, reset socket, … | `0` / `null`          |
+| `timeout` | the `timeout` option elapsed (covers reading the body too)            | `0` / `null`          |
+| `abort`   | the caller's own `signal` aborted                                     | `0` / `null`          |
+| `parse`   | a 2xx body couldn't be parsed as declared                             | set from the response |
 
 ```ts
-import { $fetch, FetchError } from '@/lib/fetch'
+import { FetchError, isHttpError, isTimeoutError } from '@/lib/fetch'
 
 try {
-  await $fetch('/users/999', { baseUrl })
+  await api.get<TUserResponse>(`/users/${encodeURIComponent(id)}`)
 } catch (error) {
-  if (error instanceof FetchError) {
+  if (isHttpError<IErrorResponse>(error)) {
     console.log(error.status) // 404
-    console.log(error.statusText) // "Not Found"
-    console.log(error.data) // parsed body, e.g. { message: "Not Found" }
-    console.log(error.message) // "Not Found" (Error.message, from data.message)
-    console.log(error.response) // raw Response
-    console.log(error.response.headers) // response Headers
+    console.log(error.data) // parsed error body, e.g. { message: "Not Found" }
+    console.log(error.message) // data.message, else statusText, else "Request failed with status 404"
+  }
+  if (isTimeoutError(error)) {
+    // back off, show "service unavailable", ...
+  }
+  if (error instanceof FetchError) {
+    console.log(error.kind, error.request.method, error.request.url)
+    console.log(error.cause) // the native error, for network/timeout/abort/parse
   }
   throw error
 }
 ```
 
-**Network-level failures** (DNS errors, aborted requests, offline, etc.) are **not** wrapped — they propagate as the exact same native error the underlying `fetch` would throw, unmodified:
+The generic on `FetchError<TData>` / `isHttpError<TData>` is the **error** body type, which is usually different from the success type. `error.request` never includes headers or the body, so logging a `FetchError` doesn't leak cookies.
+
+Errors thrown by your own `onRequest` / `onResponse` hooks are not wrapped — they propagate unchanged.
+
+In this app, Server Actions turn a `FetchError` into an `IErrorResponse` value with `handleFetchError` (`src/lib/error.ts`) rather than throwing, because Next.js hides a thrown error's message in production.
+
+---
+
+## Timeouts, Retries & Response Types
 
 ```ts
-try {
-  await $fetch('/users', { baseUrl, signal: controller.signal })
-} catch (error) {
-  // error here could be a raw DOMException('AbortError') or TypeError — untouched
-}
+const api = createFetch({
+  baseUrl,
+  timeout: 10_000, // per attempt, including reading the body
+  retry: 1, // one extra attempt for idempotent requests
+})
+
+// Per call, everything is overridable
+await api.get('/reports/export', {
+  timeout: 60_000,
+  retry: 0,
+  responseType: 'blob',
+})
+
+await api.get('/users', {
+  retry: {
+    attempts: 2,
+    methods: ['GET'], // default: GET, HEAD, OPTIONS
+    statusCodes: [502, 503, 504], // default: 408, 429, 502, 503, 504
+    baseDelayMs: 250, // exponential backoff with jitter
+    maxDelayMs: 3_000, // a longer Retry-After stops retrying instead of waiting
+  },
+})
 ```
+
+- **Timeouts** use `AbortSignal.timeout`, combined with your own `signal` via `AbortSignal.any`. A timeout throws `kind: 'timeout'`; your own abort throws `kind: 'abort'` and is never retried.
+- **Retries** are off by default and only replay failures that are safe to replay: an allowed (idempotent) method, and a `network`/`timeout` error or one of `statusCodes`. `Retry-After` is honoured up to `maxDelayMs`. Retries run before `onError`, so a hook only sees the final failure. Don't add `POST`/`PATCH` to `methods` unless the endpoint is idempotent.
 
 ---
 
@@ -418,7 +455,7 @@ Four hooks are available on both `$fetch` calls and `createFetch()` defaults:
   onResponse: (res: Response) => Response | Promise<Response>
   onSuccess: (res: FetchResponse<T>) =>
     FetchResponse<T> | Promise<FetchResponse<T>>
-  onError: (error: unknown) => unknown | Promise<unknown>
+  onError: (error: unknown, context: ErrorContext) => unknown | Promise<unknown>
 }
 ```
 
@@ -469,7 +506,7 @@ const { data } = await $fetch<{ result: TUsersResponse }>('/users', {
 
 ### `onError`
 
-Runs whenever a request fails — either an HTTP-level failure (`error` is a `FetchError`) or a network-level failure (`error` is the raw native error). Return a value to have `$fetch` **resolve** with that value instead of throwing; return `undefined` (or just don't return) to let the error keep propagating.
+Runs whenever a request fails, after any automatic retries — `error` is a `FetchError` (check `error.kind`), or whatever your own `onRequest`/`onResponse` hook threw. Return a value to have `$fetch` **resolve** with that value instead of throwing; return `undefined` (or just don't return) to let the error keep propagating.
 
 ```ts
 // Recover from a 404 with a default value instead of throwing
@@ -506,6 +543,21 @@ const api = createFetch({
 })
 ```
 
+#### Retrying from `onError`
+
+`onError` also receives a second argument, `context`, with the request as it was sent (`context.request`) and a one-shot `context.retry(init?)`. `init` is merged over the original `RequestInit` (headers per-key). The retry runs `onResponse`, the automatic retry policy, and `onSuccess`, but never `onError` again, so it cannot loop; a failed retry throws. Bodies that can only be read once (e.g. a `ReadableStream`) can't be retried.
+
+```ts
+// Refresh auth, then re-send with the new cookie (see src/lib/$fetch.ts)
+onError: async (error, context) => {
+  if (!isHttpError(error) || error.status !== 401) {
+    throw error
+  }
+  const cookie = await getFreshCookieHeader()
+  return context.retry({ headers: { Cookie: cookie } })
+}
+```
+
 ### Hook Composition (instance + call level)
 
 When using a `createFetch()` instance, `onRequest` / `onResponse` / `onSuccess` hooks **compose** — the instance-level hook runs first, and its output is passed into the call-level hook:
@@ -528,21 +580,18 @@ await api('/users', {
 // logs: "1. instance onRequest" then "2. call-level onRequest"
 ```
 
-`onError` is the exception — a call-level `onError` **fully replaces** the instance-level one (control-flow hooks like throw/recover don't compose meaningfully):
+`onError` composes in the **opposite** order — the call-level hook runs first. If it recovers (returns a value) or throws a _different_ error, that wins; if it returns `undefined` or rethrows the same error, the instance-level hook still runs. That keeps an instance-wide concern like silent token refresh working even when a call adds its own error handling:
 
 ```ts
 const api = createFetch({
   baseUrl,
-  onError: (error) => {
-    console.error('instance-level logging')
-    throw error
-  },
+  onError: async (error, context) => refreshAndRetry(error, context), // instance-level
 })
 
 await api('/users', {
   onError: (error) => {
-    // this REPLACES the instance-level onError above for this call
-    return fallbackValue
+    console.warn('users request failed', error) // runs first
+    // returns undefined → the instance-level refresh still gets its turn
   },
 })
 ```
@@ -553,14 +602,14 @@ await api('/users', {
 
 When calling through a `createFetch()` instance, per-call config is merged over the instance defaults as follows:
 
-| Option                                                                               | Merge behavior                                        |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| `headers`                                                                            | shallow-merged; call-level wins per-key               |
-| `params`                                                                             | shallow-merged; call-level wins per-key               |
-| `next` (`revalidate`, `tags`)                                                        | shallow-merged; call-level wins per-key               |
-| `onRequest`, `onResponse`, `onSuccess`                                               | composed — instance runs first, then call-level       |
-| `onError`                                                                            | call-level fully replaces instance-level, if provided |
-| everything else (`method`, `cache`, `credentials`, `mode`, `signal`, `baseUrl`, ...) | call-level overrides instance default                 |
+| Option                                                                                            | Merge behavior                                                                        |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `headers`                                                                                         | shallow-merged; call-level wins per-key                                               |
+| `params`                                                                                          | shallow-merged; call-level wins per-key                                               |
+| `next` (`revalidate`, `tags`)                                                                     | shallow-merged; call-level wins per-key                                               |
+| `onRequest`, `onResponse`, `onSuccess`                                                            | composed — instance runs first, then call-level                                       |
+| `onError`                                                                                         | composed — call-level runs first, instance-level unless the call-level hook recovered |
+| everything else (`method`, `cache`, `signal`, `baseUrl`, `timeout`, `retry`, `responseType`, ...) | call-level overrides instance default                                                 |
 
 ---
 
@@ -581,189 +630,7 @@ await $fetch('/users', { baseUrl, cache: 'no-store' })
 
 These options are server-only; on the client they're simply ignored, matching Next.js's own `fetch` behavior.
 
----
-
-## `useFetch` — React Hook for Actions & Client Calls
-
-`use-fetch.ts` is a small **Client Component** hook (`'use client'`) that wraps any async function — a Next.js **Server Action**, or a plain client call through `$fetch`/a `createFetch()` instance — with `loading` / `error` / `success` state, so components don't need to hand-roll `useState`/`useEffect` boilerplate around every call.
-
-```ts
-import { useFetch } from '@/lib/fetch'
-```
-
-```ts
-function useFetch<TData, TArgs extends unknown[]>(
-  options: UseFetchOptions<TData, TArgs>
-): UseFetchResult<TData, TArgs>
-```
-
-**Options (`UseFetchOptions<TData, TArgs>`):**
-
-| Option      | Type                                      | Description                                                                                                |
-| ----------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `action`    | `(...args: TArgs) => Promise<TData>`      | The async function to run.                                                                                 |
-| `immediate` | `boolean` (default `false`)               | Auto-run `action` once on mount, using `args` if provided.                                                 |
-| `args`      | `TArgs`                                   | Default arguments — used for the `immediate` call, and as a fallback when `execute()` is called with none. |
-| `onSuccess` | `(data: TData) => void \| Promise<void>`  | Called after a successful resolution.                                                                      |
-| `onError`   | `(error: Error) => void \| Promise<void>` | Called after a rejection (error is normalized to an `Error`).                                              |
-
-**Result (`UseFetchResult<TData, TArgs>`):**
-
-| Field                                 | Type                                          | Description                                                                                                                                  |
-| ------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data`                                | `TData \| null`                               | Last successful result.                                                                                                                      |
-| `error`                               | `Error \| null`                               | Last error, if any.                                                                                                                          |
-| `status`                              | `'idle' \| 'loading' \| 'success' \| 'error'` | Current lifecycle status.                                                                                                                    |
-| `isLoading` / `isSuccess` / `isError` | `boolean`                                     | Convenience flags derived from `status`.                                                                                                     |
-| `execute`                             | `(...args: TArgs \| []) => Promise<TData>`    | Manually triggers `action`. Throws on failure — wrap in `try/catch` if you need to swallow it (state is already updated for you either way). |
-| `reset`                               | `() => void`                                  | Resets `data`/`error`/`status` back to their initial values.                                                                                 |
-
-### Manual trigger
-
-```tsx
-'use client'
-
-import { useFetch } from '@/lib/fetch'
-import { loginUser } from '@/app/actions/auth'
-import type { TLoginInput } from '@/types/auth.types'
-
-export function LoginButton({ data }: { data: TLoginInput }) {
-  const { execute, isLoading, isError, error } = useFetch({
-    action: (input: TLoginInput) => loginUser(input),
-    onSuccess: () => {
-      window.location.assign('/dashboard')
-    },
-  })
-
-  return (
-    <div>
-      <button
-        onClick={() => execute(data).catch(() => {})}
-        disabled={isLoading}
-      >
-        {isLoading ? 'Signing in…' : 'Sign in'}
-      </button>
-      {isError && <p>Failed: {error?.message}</p>}
-    </div>
-  )
-}
-```
-
-### Run immediately on mount
-
-Set `immediate: true` and provide `args` (or none, if `action` takes no arguments) to fetch as soon as the component renders — similar to a typical `useEffect`-driven data fetch, but with state already managed for you.
-
-```tsx
-'use client'
-
-import { useFetch } from '@/lib/fetch'
-import { getAllUsers } from '@/app/actions/user'
-import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
-
-export function UsersList() {
-  const { data, isLoading, isError, error } = useFetch<
-    TUsersResponse,
-    [TUserQueryOptions]
-  >({
-    action: (params) => getAllUsers(params),
-    immediate: true,
-    args: [{ page: 1, limit: 20 }],
-  })
-
-  if (isLoading) return <p>Loading…</p>
-  if (isError) return <p>Failed: {error?.message}</p>
-
-  return (
-    <ul>
-      {data?.data.map((u) => (
-        <li key={u.id}>{u.email}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-### Passing arguments
-
-`execute(...)` accepts arguments matching `action`'s signature. If called with no arguments, it falls back to the `args` option (useful for "refresh with the same params" buttons):
-
-```tsx
-import { getAllUsers } from '@/app/actions/user'
-import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
-
-const { execute } = useFetch<TUsersResponse, [TUserQueryOptions]>({
-  action: (params) => getAllUsers(params),
-  args: [{ page: 1, limit: 20 }],
-})
-
-// explicit params
-await execute({ page: 2, limit: 10 })
-
-// falls back to `args` -> page 1, limit 20
-await execute()
-```
-
-### `onSuccess` / `onError` callbacks
-
-Useful for side effects like toasts, redirects, or cache invalidation, alongside the returned `data`/`error` state:
-
-```tsx
-import { updateMyProfile } from '@/app/actions/user'
-import type { TUserResponse, TUpdateProfileInput } from '@/types/user.types'
-
-const { execute } = useFetch<TUserResponse, [TUpdateProfileInput]>({
-  action: (data) => updateMyProfile(data),
-  onSuccess: (updated) => {
-    toast.success(`Profile updated: ${updated.data.email}`)
-  },
-  onError: (error) => {
-    toast.error(error.message)
-  },
-})
-```
-
-### Resetting state
-
-```tsx
-import { updateMyProfile } from '@/app/actions/user'
-
-const { execute, reset, status } = useFetch({ action: updateMyProfile })
-
-// e.g. clear a success/error banner when a modal closes
-useEffect(() => {
-  if (!isModalOpen) reset()
-}, [isModalOpen, reset])
-```
-
-### Using `useFetch` with the `api` client (not just Server Actions)
-
-Since `action` is just `(...args) => Promise<TData>`, it composes naturally with the `$fetch`/`createFetch` client from this same package — just unwrap `.data` (or pass through the whole `FetchResponse` if you'd rather keep `status`/`response` too):
-
-```tsx
-'use client'
-
-import { useFetch } from '@/lib/fetch'
-import { $fetch } from '@/lib/$fetch'
-import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
-
-export function UsersList() {
-  const { data, isLoading, isError } = useFetch<
-    TUsersResponse,
-    [TUserQueryOptions]
-  >({
-    action: (params) =>
-      $fetch
-        .get<TUsersResponse, TUserQueryOptions>('/users', { params })
-        .then((r) => r.data),
-    immediate: true,
-    args: [{ page: 1, limit: 20 }],
-  })
-
-  // ...
-}
-```
-
-> **Note:** `use-fetch.ts` has a `'use client'` directive. Re-exporting it from the shared `index.ts` barrel alongside `$fetch`/`createFetch` is fine — Next.js only draws the client boundary at components that actually _use_ the hook — but if you'd rather keep server and client exports fully separate, import it directly from `@/lib/fetch/use-fetch` instead of the barrel.
+> **Next.js 16:** `fetch` is **not cached by default**, and reading `cookies()` (which the app client does on every call) makes the route dynamic. `next.tags` alone therefore creates no cache entry. In Server Actions, invalidate with `updateTag(tag)` so the user sees their own write on the next render; `revalidateTag(tag, 'max')` serves stale content while it revalidates.
 
 ---
 
@@ -802,145 +669,14 @@ When Next.js renders a Server Component or executes a Server Action, it runs on 
 
 You must manually forward the incoming cookies using `next/headers`:
 
-```ts
-import { cookies } from 'next/headers'
-import { parseSetCookie } from 'set-cookie-parser'
-import { createFetch } from './fetch'
-import { FetchError } from './fetch/fetch-error'
+The configured client in [`src/lib/$fetch.ts`](../$fetch.ts) does this for the whole app:
 
-type SameSite = 'lax' | 'strict' | 'none' | undefined
+- `onRequest` forwards **only the auth cookies** (`accessToken`, `refreshToken`) as a `Cookie` header.
+- `onResponse` mirrors **only auth** `Set-Cookie` headers back with `cookies().set()`, dropping `Domain` (the cookie is re-issued by the Next.js origin).
+- `onError` handles a 401 from a non-`/auth/*` endpoint: `refreshSession()` (`src/lib/auth/refresh.ts`), then `context.retry()` with the new `Cookie` header.
+- `timeout: 10_000` and `retry: 1` for idempotent reads.
 
-// Deduplication promise for concurrent 401 errors
-let refreshPromise: Promise<void> | null = null
-const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1` // `${process.env.NEXT_PUBLIC_SITE_URL}/server`, //While using rewrites
-const refreshUrl = `${baseUrl}/auth/refresh-token`
-
-const $fetch = createFetch({
-  baseUrl: baseUrl,
-  headers: { 'Content-Type': 'application/json' },
-  credentials: 'include',
-
-  onRequest: async (req) => {
-    // Forward the client's HttpOnly cookies to the downstream backend.
-    const cookieStore = await cookies()
-    const cookieString = cookieStore.toString()
-
-    if (cookieString) {
-      const headers = new Headers(req.init.headers)
-      headers.set('Cookie', cookieString)
-      req.init.headers = headers
-    }
-
-    return req
-  },
-
-  onResponse: async (res) => {
-    // Forward any Set-Cookie headers from the backend back to the browser.
-    const setCookieHeaders = res.headers.getSetCookie?.() ?? []
-
-    if (setCookieHeaders.length > 0) {
-      const parsedCookies = parseSetCookie(setCookieHeaders, {
-        decodeValues: true,
-      })
-      const cookieStore = await cookies()
-
-      for (const cookie of parsedCookies) {
-        const { name, value, ...rest } = cookie
-        const options: Parameters<typeof cookieStore.set>[2] = {
-          ...rest,
-          sameSite: rest.sameSite as SameSite,
-        }
-        try {
-          cookieStore.set(name, value, options)
-        } catch {
-          // Silently ignore — cookies().set() throws when called inside a
-          // Server Component render (read-only context). It works fine in
-          // Server Actions and Route Handlers.
-        }
-      }
-    }
-
-    return res
-  },
-
-  onError: async (error: unknown) => {
-    // Auto-refresh on 401 errors
-    if (error instanceof FetchError && error.status === 401) {
-      // Deduplicate refresh calls to prevent multiple concurrent refreshes
-      if (!refreshPromise) {
-        refreshPromise = (async () => {
-          try {
-            // Call refresh endpoint directly using native fetch to avoid circular dependency
-            const cookieStore = await cookies()
-            const cookieString = cookieStore.toString()
-
-            const headers = new Headers({
-              'Content-Type': 'application/json',
-            })
-
-            if (cookieString) {
-              headers.set('Cookie', cookieString)
-            }
-
-            const response = await fetch(refreshUrl, {
-              method: 'POST',
-              headers,
-              credentials: 'include',
-            })
-
-            // Forward Set-Cookie headers from refresh response using robust parser
-            const setCookieHeaders = response.headers.getSetCookie?.() ?? []
-            if (setCookieHeaders.length > 0) {
-              const parsedCookies = parseSetCookie(setCookieHeaders, {
-                decodeValues: true,
-              })
-
-              for (const cookie of parsedCookies) {
-                const { name, value, ...rest } = cookie
-                const options: Parameters<typeof cookieStore.set>[2] = {
-                  ...rest,
-                  sameSite: rest.sameSite as SameSite,
-                }
-                try {
-                  cookieStore.set(name, value, options)
-                } catch {
-                  // Silently ignore
-                }
-              }
-            }
-
-            if (!response.ok) {
-              throw new Error(`Token refresh failed: ${response.status}`)
-            }
-
-            console.log('[fetch] Token refreshed successfully')
-          } catch (refreshError) {
-            console.error('[fetch] Token refresh failed:', refreshError)
-            throw refreshError
-          }
-        })().finally(() => {
-          refreshPromise = null
-        })
-      }
-
-      try {
-        await refreshPromise
-      } catch {
-        // Refresh failed - rethrow the original 401 error
-        throw error
-      }
-
-      // Refresh succeeded - rethrow the original 401 error so caller can retry
-      throw error
-    }
-
-    console.error('Fetch error:', error)
-    throw error
-  },
-})
-
-export { $fetch }
-```
+Read that file rather than copying a snapshot of it from here.
 
 > **Note:** `cookies().set()` from `next/headers` throws when called inside a Server Component's render (read-only context). The `onResponse` cookie-write logic is silently ignored there — it only takes effect inside Server Actions and Route Handlers.
 
@@ -993,35 +729,35 @@ Because these are `HttpOnly`, `document.cookie` never sees them and neither does
 // features/auth/login-form.tsx
 'use client'
 
-import { useFetch } from '@/lib/fetch'
 import { login } from '@/features/auth/api'
+import { useState, useTransition } from 'react'
 
 export function LoginForm() {
-  const { execute, isLoading, isError, error } = useFetch({
-    action: (email: string, password: string) =>
-      login({ email, password }).then((r) => r.data),
-    onSuccess: () => {
-      window.location.assign('/dashboard') // full navigation so Server Components re-read the new cookies
-    },
-  })
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        const form = new FormData(e.currentTarget)
-        void execute(
-          String(form.get('email')),
-          String(form.get('password'))
-        ).catch(() => {})
-      }}
+      action={(form) =>
+        startTransition(async () => {
+          try {
+            await login({
+              email: String(form.get('email')),
+              password: String(form.get('password')),
+            })
+            window.location.assign('/dashboard') // full navigation so Server Components re-read the new cookies
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Sign-in failed')
+          }
+        })
+      }
     >
       <input name="email" type="email" required />
       <input name="password" type="password" required />
-      <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Signing in…' : 'Sign in'}
+      <button type="submit" disabled={isPending}>
+        {isPending ? 'Signing in…' : 'Sign in'}
       </button>
-      {isError && <p>{error?.message}</p>}
+      {error && <p>{error}</p>}
     </form>
   )
 }
@@ -1132,35 +868,6 @@ export function logout() {
 }
 ```
 
-#### 5. Wiring it into `useFetch`
-
-`withAuthRetry` composes with `useFetch` exactly like any other async function:
-
-```tsx
-'use client'
-
-import { useFetch } from '@/lib/fetch'
-import { getUsers } from '@/features/users/api'
-import type { TUsersResponse, TUserQueryOptions } from '@/types/user.types'
-
-export function UsersList() {
-  const { data, isLoading, isError, error } = useFetch<
-    TUsersResponse,
-    [TUserQueryOptions]
-  >({
-    action: (params) => getUsers(params).then((r) => r.data),
-    immediate: true,
-    args: [{ page: 1 }],
-    onError: (err) => {
-      // e.g. redirect on final auth failure after the retry already happened inside getUsers
-      if (err.message.includes('401')) router.push('/login')
-    },
-  })
-
-  // ...
-}
-```
-
 ### Server Components, Server Actions & Route Handlers (Node.js) — cookies are NOT automatic
 
 This is the part worth double-checking: code in a Server Component, Server Action, or Route Handler runs on the server, in Node.js — there is no browser, so there's no automatic cookie jar. Setting `credentials: 'include'` here has **no effect at all**; the underlying `fetch` (undici) simply doesn't have any cookies to attach unless you put them on the request yourself, and it won't store anything from `Set-Cookie` unless you write it back to the Next.js response yourself.
@@ -1247,7 +954,8 @@ Node's `fetch` (undici) exposes every individual `Set-Cookie` header via `respon
 'use server'
 
 import { cookies } from 'next/headers'
-import { $fetch, FetchError } from '@/lib/fetch'
+import { $fetch } from '@/lib/fetch/fetch'
+import { FetchError } from '@/lib/fetch'
 
 export interface LoginBody {
   email: string
@@ -1370,7 +1078,7 @@ Unlike the client-side `withAuthRetry`, a Server Component can't retry itself mi
 'use server'
 
 import { cookies } from 'next/headers'
-import { $fetch } from '@/lib/fetch'
+import { $fetch } from '@/lib/fetch/fetch'
 import { applySetCookies } from '@/features/auth/actions'
 
 export async function refreshAccessTokenServer(): Promise<void> {
@@ -1425,7 +1133,7 @@ This has to be called from something that can write cookies (a Server Action, or
 'use server'
 
 import { cookies } from 'next/headers'
-import { $fetch } from '@/lib/fetch'
+import { $fetch } from '@/lib/fetch/fetch'
 
 export async function logoutAction(): Promise<void> {
   const incomingCookies = cookies()
@@ -1465,39 +1173,18 @@ and cookies need `SameSite=None; Secure` instead of `Lax`/`Strict` for cross-sit
 A complete, end-to-end setup showing the **actual pattern used in this project** — HttpOnly cookie-based auth via `src/lib/$fetch.ts` + server actions:
 
 ```ts
-// src/lib/$fetch.ts — the pre-configured server-side instance
-import { cookies } from 'next/headers'
-import { createFetch } from '@/lib/fetch'
+// src/lib/$fetch.ts — the pre-configured server-side instance (abridged; read the file)
+import 'server-only'
+import { API_BASE_URL } from '@/env'
+import { createFetch, isHttpError } from '@/lib/fetch'
 
 export const $fetch = createFetch({
-  baseUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/server`,
-  headers: { 'Content-Type': 'application/json' },
-  credentials: 'include',
-
-  onRequest: async (req) => {
-    // Forward the client's HttpOnly cookies to the downstream backend
-    const cookieStore = await cookies()
-    const cookieString = cookieStore.toString()
-    if (cookieString) {
-      const headers = new Headers(req.init.headers)
-      headers.set('Cookie', cookieString)
-      req.init.headers = headers
-    }
-    return req
-  },
-
-  onResponse: async (res) => {
-    // Forward any Set-Cookie headers back to the browser (e.g. token rotation)
-    const setCookieHeaders = res.headers.getSetCookie?.() ?? []
-    if (setCookieHeaders.length > 0) {
-      const cookieStore = await cookies()
-      for (const raw of setCookieHeaders) {
-        // ... parse and set (see src/lib/$fetch.ts for full implementation)
-        ;(void raw, cookieStore)
-      }
-    }
-    return res
-  },
+  baseUrl: API_BASE_URL,
+  timeout: 10_000,
+  retry: 1,
+  onRequest: forwardAuthCookies, // only accessToken/refreshToken
+  onResponse: mirrorAuthSetCookies, // only auth cookies, Domain dropped
+  onError: refreshOn401AndRetry, // skips /auth/*, retries once
 })
 ```
 
@@ -1571,36 +1258,36 @@ export default async function UsersPage() {
 ```
 
 ```tsx
-// src/components/modules/auth/login-form.tsx — Client Component using useFetch + Server Action
+// src/components/modules/auth/login-form.tsx — Client Component + Server Action (abridged)
 'use client'
 
-import { useFetch } from '@/lib/fetch'
 import { loginUser } from '@/app/actions/auth'
 import type { TLoginInput } from '@/types/auth.types'
+import { useTransition } from 'react'
+import { toast } from 'sonner'
 
 export function LoginForm() {
-  const { execute, isLoading, isError, error } = useFetch({
-    action: (data: TLoginInput) => loginUser(data),
-    onSuccess: () => {
-      window.location.assign('/dashboard')
-    },
-  })
+  const [isPending, startTransition] = useTransition()
 
   const onSubmit = (data: TLoginInput) => {
-    void execute(data).catch(() => {})
+    startTransition(async () => {
+      // Expected failures (bad credentials, validation, outage) come back as
+      // an IErrorResponse value — the action never throws for them.
+      const result = await loginUser(data)
+      if (result.success) {
+        window.location.assign('/dashboard')
+        return
+      }
+      toast.error(result.message)
+    })
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault() /* ... call onSubmit */
-      }}
-    >
+    <form /* react-hook-form handleSubmit(onSubmit) */>
       {/* form fields */}
-      <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Signing in…' : 'Sign in'}
+      <button type="submit" disabled={isPending}>
+        {isPending ? 'Signing in…' : 'Sign in'}
       </button>
-      {isError && <p>{error?.message}</p>}
     </form>
   )
 }
@@ -1620,25 +1307,21 @@ The core fetch wrapper. Also exposes `.get`, `.post`, `.put`, `.patch`, `.delete
   - `params?: TParams`
   - `body?: TBody | BodyInit | null`
   - `next?: { revalidate?: number | false; tags?: string[] }`
+  - `timeout?: number` — ms per attempt
+  - `retry?: number | RetryOptions`
+  - `responseType?: 'auto' | 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream'`
   - `onRequest? / onResponse? / onSuccess? / onError?`
 - Returns: `Promise<FetchResponse<TResponse>>`
-- Throws: `FetchError` on HTTP failure, or the original native error on network failure (unless recovered by `onError`).
+- Throws: `FetchError` for every HTTP and transport failure (see `kind`), unless recovered by `onError`.
 
 ### `createFetch(defaults?)`
 
 Creates a preconfigured, callable instance with the same signature (and method shorthands) as `$fetch`, merging `defaults` under every call per the [Config Merge Rules](#config-merge-rules).
 
-### `FetchError<TResponse>`
+### `FetchError<TData>`
 
-Extends `Error`. Properties: `response`, `status`, `statusText`, `ok`, `url`, `data`, plus the standard `message` (and `cause`, when a network error is wrapped internally).
-
-### `useFetch<TData, TArgs>(options)`
-
-Client Component hook (`'use client'`) that wraps any async function — a Server Action, or a `$fetch`/`createFetch()` call — with `idle`/`loading`/`success`/`error` state. See [`useFetch` — React Hook for Actions & Client Calls](#usefetch--react-hook-for-actions--client-calls).
-
-- `options: UseFetchOptions<TData, TArgs>` — `action`, `immediate?`, `args?`, `onSuccess?`, `onError?`.
-- Returns: `UseFetchResult<TData, TArgs>` — `data`, `error`, `status`, `isLoading`, `isSuccess`, `isError`, `execute`, `reset`.
+Extends `Error`. Properties: `kind`, `request` (`{ method, url }`), `response` (or `null`), `status` (`0` without a response), `statusText`, `ok`, `url`, `data` (the parsed **error** body), plus `message` and `cause`. Guards: `isFetchError`, `isHttpError`, `isTimeoutError`, `isNetworkError`.
 
 ### Types
 
-`FetchConfig`, `FetchResponse`, `FetchHooks`, `CreateFetchConfig`, `RequestContext`, `QueryParams`, `QueryParamValue`, `Primitive`, `FetchBody`, `NextFetchRequestConfig`, `FetchFn`, `FetchMethods`, `OnRequestHook`, `OnResponseHook`, `OnSuccessHook`, `OnErrorHook`, `FetchStatus`, `UseFetchOptions`, `UseFetchResult` — all exported from `@/lib/fetch`.
+`FetchConfig`, `FetchResponse`, `FetchHooks`, `CreateFetchConfig`, `RequestContext`, `QueryParams`, `QueryParamValue`, `Primitive`, `FetchBody`, `NextFetchRequestConfig`, `FetchFn`, `FetchMethods`, `OnRequestHook`, `OnResponseHook`, `OnSuccessHook`, `OnErrorHook`, `ErrorContext`, `ResponseType`, `RetryOptions`, `FetchErrorKind`, `FetchErrorRequest`, `FetchErrorInit` — all exported from `@/lib/fetch`.

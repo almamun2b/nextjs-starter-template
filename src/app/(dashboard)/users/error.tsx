@@ -12,7 +12,7 @@ interface UsersErrorProps {
 
 /**
  * Segment-level boundary. Catches anything the inline error state cannot —
- * e.g. a 401 rethrown by `handleFetchError` during a mutation.
+ * e.g. the backend being unreachable while the page's guards run.
  */
 const UsersError = ({ error, reset }: UsersErrorProps) => {
   useEffect(() => {

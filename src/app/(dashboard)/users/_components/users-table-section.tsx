@@ -1,5 +1,5 @@
 import { getAllUsers } from '@/app/actions/user'
-import { isFetchError } from '@/lib/error'
+import { FetchError, isFetchError } from '@/lib/fetch'
 import { type IMeta } from '@/types/response.types'
 import { type IUser } from '@/types/user.types'
 import { type TUserQueryParams } from '@/validation/user-query.validation'
@@ -15,9 +15,15 @@ type TUsersResult =
   | { ok: true; users: IUser[]; meta: IMeta }
   | { ok: false; title: string; message: string }
 
-/** Turns a thrown fetch failure into something worth showing a human. */
-function describeError(error: unknown): { title: string; message: string } {
-  if (isFetchError(error)) {
+/** Turns a failed backend call into something worth showing a human. */
+function describeError(error: FetchError): { title: string; message: string } {
+  if (error.kind === 'timeout' || error.kind === 'network') {
+    return {
+      title: 'Service unavailable',
+      message: 'The user directory could not be reached. Please try again.',
+    }
+  }
+  if (error.kind === 'http') {
     if (error.status === 401) {
       return {
         title: 'Session expired',
@@ -31,16 +37,9 @@ function describeError(error: unknown): { title: string; message: string } {
           'Your account does not have permission to view the user directory.',
       }
     }
-    return { title: 'Could not load users', message: error.message }
   }
 
-  return {
-    title: 'Could not load users',
-    message:
-      error instanceof Error
-        ? error.message
-        : 'An unexpected error occurred while loading users.',
-  }
+  return { title: 'Could not load users', message: error.message }
 }
 
 /**
@@ -52,6 +51,8 @@ async function loadUsers(params: TUserQueryParams): Promise<TUsersResult> {
     const response = await getAllUsers(toUserQueryOptions(params))
     return { ok: true, users: response.data, meta: response.meta }
   } catch (error) {
+    // Guard interrupts (`redirect`, `forbidden`) must keep propagating.
+    if (!isFetchError(error)) throw error
     return { ok: false, ...describeError(error) }
   }
 }

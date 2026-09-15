@@ -6,17 +6,25 @@ import {
   resolveRoutePolicy,
 } from '@/lib/auth/route-policy'
 import { hasPermission } from '@/lib/auth/permissions'
+import {
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+  toNextCookie,
+} from '@/lib/auth/cookies'
+import { needsRefresh, refreshSession } from '@/lib/auth/refresh'
 import { verifyAccessToken } from '@/lib/auth/token'
 import { readUserRole } from '@/lib/user-format'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import type { Cookie } from 'set-cookie-parser'
 
 /*
  * ---------------------------------------------------------------------------
  * Optimistic access gate.
  *
  * Runs on every request, so it stays cheap: it reads cookies and verifies a
- * JWT signature, and never talks to the backend. Per the Next.js auth guide
+ * JWT signature, and only talks to the backend to refresh an access token
+ * that is missing, expired, or about to expire. Per the Next.js auth guide
  * this is a pre-filter, not the security boundary — the real check is
  * `requirePermission` in `src/lib/auth/dal.ts`, called by each page and each
  * Server Action. Server Functions POST to the route they live on, so a matcher
@@ -35,45 +43,99 @@ const loginUrl = (request: NextRequest): URL => {
   return url
 }
 
-export function proxy(request: NextRequest) {
+/** Auth-cookie changes to mirror onto whichever response the proxy returns. */
+interface IPendingCookies {
+  set: Cookie[]
+  clear: boolean
+}
+
+const withAuthCookies = (
+  response: NextResponse,
+  pending: IPendingCookies
+): NextResponse => {
+  for (const cookie of pending.set) {
+    response.cookies.set(toNextCookie(cookie))
+  }
+  if (pending.clear) {
+    response.cookies.delete(ACCESS_TOKEN_COOKIE)
+    response.cookies.delete(REFRESH_TOKEN_COOKIE)
+  }
+  return response
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const accessToken = request.cookies.get('accessToken')?.value
-  const refreshToken = request.cookies.get('refreshToken')?.value
+  const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value
+  const pending: IPendingCookies = { set: [], clear: false }
+  let refreshUnavailable = false
 
-  const verification = verifyAccessToken(accessToken)
+  let verification = verifyAccessToken(
+    request.cookies.get(ACCESS_TOKEN_COOKIE)?.value
+  )
 
-  // An expired access token next to a live refresh token is the ordinary
-  // mid-session state — `$fetch` will rotate it on the next backend call. It
-  // must read as signed in, or every token rotation would log the user out.
-  const isRenewable = verification.status === 'expired' && !!refreshToken
-  const isAuthenticated = verification.status === 'valid' || isRenewable
+  // Refresh *here*, before rendering: Server Components cannot write cookies,
+  // so a refresh that waits for `$fetch` to hit a 401 mid-render would never
+  // reach the browser. The new cookies go on the forwarded request (so this
+  // render's `cookies()` sees them) and on the response (so the browser does).
+  if (refreshToken && needsRefresh(verification)) {
+    const result = await refreshSession(refreshToken)
 
-  if (isAuthenticated && isAuthRoute(pathname)) {
-    return NextResponse.redirect(
-      new URL(DEFAULT_AUTHENTICATED_ROUTE, request.url)
+    if (result.status === 'ok') {
+      for (const { name, value } of result.cookies) {
+        request.cookies.set(name, value)
+      }
+      pending.set = result.cookies
+      verification = verifyAccessToken(
+        request.cookies.get(ACCESS_TOKEN_COOKIE)?.value
+      )
+    } else if (result.status === 'rejected') {
+      request.cookies.delete(ACCESS_TOKEN_COOKIE)
+      request.cookies.delete(REFRESH_TOKEN_COOKIE)
+      pending.clear = true
+      verification = { status: 'invalid' }
+    } else {
+      // Backend unreachable — don't log the user out over a blip. Let the
+      // request through unfiltered; the DAL still decides downstream.
+      refreshUnavailable = true
+    }
+  }
+
+  const claims = verification.status === 'valid' ? verification.claims : null
+  const next = () =>
+    withAuthCookies(
+      NextResponse.next({ request: { headers: request.headers } }),
+      pending
+    )
+
+  if (claims && isAuthRoute(pathname)) {
+    return withAuthCookies(
+      NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_ROUTE, request.url)),
+      pending
     )
   }
 
   const policy = resolveRoutePolicy(pathname)
-  if (!policy) return NextResponse.next()
+  if (!policy) return next()
 
-  if (!isAuthenticated) {
-    return NextResponse.redirect(loginUrl(request))
+  if (!claims) {
+    return refreshUnavailable
+      ? next()
+      : withAuthCookies(NextResponse.redirect(loginUrl(request)), pending)
   }
 
-  // Role gating needs verified claims. While the token is merely stale we let
-  // the request through unfiltered rather than authorizing on claims we have
-  // not checked — the DAL still denies it downstream if the role is wrong.
-  if (verification.status === 'valid') {
-    const role = readUserRole(verification.claims.role)
-    if (!hasPermission(role, policy.permission)) {
-      // Rewrite, not redirect: the URL stays put and `/403` renders the same
-      // `forbidden()` interrupt (and 403 status) a page-level denial produces.
-      return NextResponse.rewrite(new URL(FORBIDDEN_ROUTE, request.url))
-    }
+  const role = readUserRole(claims.role)
+  if (!hasPermission(role, policy.permission)) {
+    // Rewrite, not redirect: the URL stays put and `/403` renders the same
+    // `forbidden()` interrupt (and 403 status) a page-level denial produces.
+    return withAuthCookies(
+      NextResponse.rewrite(new URL(FORBIDDEN_ROUTE, request.url), {
+        request: { headers: request.headers },
+      }),
+      pending
+    )
   }
 
-  return NextResponse.next()
+  return next()
 }
 
 export const config = {

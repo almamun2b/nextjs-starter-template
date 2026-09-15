@@ -56,7 +56,7 @@ export function UserRoleDialog({
 
   const handleSubmit = () => {
     startTransition(async () => {
-      // `updateUserRole` throws on failure rather than returning an error union.
+      // Expected failures come back as a result; the catch covers anything else.
       try {
         const result = await updateUserRole(user.id, {
           role: toRoleParam(role),

@@ -1,30 +1,45 @@
 /**
- * Public entry point for the type-safe Next.js `$fetch` utility.
+ * Public entry point for the type-safe Next.js fetch core.
  *
- * - `$fetch` — the ready-to-use fetch wrapper (plus `.get`/`.post`/`.put`/`.patch`/`.delete`/`.head` shorthands).
- * - `createFetch` — creates a preconfigured instance (e.g. with a shared `baseUrl`).
- * - `FetchError` — the error class thrown on HTTP-level failures.
+ * - `createFetch` — creates a preconfigured instance (base URL, headers, hooks, timeout, retry).
+ * - `FetchError` + `isFetchError`/`isHttpError`/`isTimeoutError`/`isNetworkError` — the error thrown for every failure.
+ *
+ * The unconfigured core `$fetch` is deliberately not re-exported here: app
+ * code should use the configured backend client from `@/lib/$fetch`, and the
+ * shared name made it easy to import the wrong one (no base URL, no auth).
+ * Import it from `@/lib/fetch/fetch` if you really need it.
  */
 export { createFetch } from './create-fetch'
-export { $fetch } from './fetch'
-export { FetchError } from './fetch-error'
+export {
+  FetchError,
+  isFetchError,
+  isHttpError,
+  isNetworkError,
+  isTimeoutError,
+} from './fetch-error'
+export type {
+  FetchErrorInit,
+  FetchErrorKind,
+  FetchErrorRequest,
+} from './fetch-error'
 export type { FetchMethods } from './method-shorthands'
 export type {
+  CreateFetchConfig,
+  ErrorContext,
   FetchBody,
   FetchConfig,
   FetchFn,
   FetchHooks,
   FetchResponse,
-  CreateFetchConfig,
   NextFetchRequestConfig,
   OnErrorHook,
   OnRequestHook,
   OnResponseHook,
   OnSuccessHook,
   Primitive,
-  QueryParams,
   QueryParamValue,
+  QueryParams,
   RequestContext,
+  ResponseType,
+  RetryOptions,
 } from './types'
-export { useFetch } from './use-fetch'
-export type { FetchStatus, UseFetchOptions, UseFetchResult } from './use-fetch'

@@ -22,15 +22,23 @@ interface IErrors {
   message: string | null
 }
 
-interface IResponse {
+interface IResponseBase {
   statusCode: number
-  success: boolean
   message: string
   timestamp: string
   path: string
 }
 
-interface IErrorResponse extends IResponse {
+/**
+ * `success` is a literal on both envelopes, so `if (result.success)` narrows
+ * a Server Action's `T | IErrorResponse` result to the right branch.
+ */
+interface IResponse extends IResponseBase {
+  success: true
+}
+
+interface IErrorResponse extends IResponseBase {
+  success: false
   errors: IErrors[] | null
   code: string
 }
@@ -38,6 +46,7 @@ interface IErrorResponse extends IResponse {
 export type {
   CursorDirection,
   IErrorResponse,
+  IErrors,
   IMeta,
   IMetaCursor,
   IResponse,

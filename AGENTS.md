@@ -17,8 +17,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Environment
 
-- Copy `.env.example` to `.env` and set `NEXT_PUBLIC_API_URL` (default `http://localhost:5000`), `NEXT_PUBLIC_SITE_URL` (default `http://localhost:3000`), and `ACCESS_TOKEN_SECRET` (must match the backend's signing secret — the proxy reads the role claim with it).
-- `$fetch` talks to `${NEXT_PUBLIC_API_URL}/api/v1` directly; the `/server/:path*` rewrite in `next.config.ts` also maps to it.
+- Copy `.env.example` to `.env` and set `NEXT_PUBLIC_API_URL` (default `http://localhost:5000`), `NEXT_PUBLIC_SITE_URL` (default `http://localhost:3000`), and `ACCESS_TOKEN_SECRET` (must match the backend's signing secret — the proxy reads the role claim with it). `ACCESS_TOKEN_SECRET` has **no fallback**: the proxy throws if it is missing.
+- Optional `API_URL` (server-only) overrides `NEXT_PUBLIC_API_URL` for server-to-server calls, e.g. an internal hostname. All env reads go through `src/env.ts`.
+- `$fetch` talks to `${API_BASE_URL}` (`src/env.ts`, `<API_URL>/api/v1`) directly; the `/server/:path*` rewrite in `next.config.ts` also maps to it.
 - `.env` is gitignored — never commit secrets. `.env.example` is the source of truth for required vars.
 
 ## Commands
@@ -53,13 +54,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture — auth/cookie/refr
 
 ## Data layer and API conventions
 
-- API client configured in `src/lib/$fetch.ts` using `createFetch()` from `src/lib/fetch/`.
-- Auto-refresh on 401 is built into `$fetch` (via `onError` handler); do not duplicate.
+- API client configured in `src/lib/$fetch.ts` (`server-only`) using `createFetch()` from `src/lib/fetch/`. Always import `$fetch` from `@/lib/$fetch`; the unconfigured core (`@/lib/fetch/fetch`) has no base URL, auth, or timeout.
+- Every call has a 10s per-attempt timeout and one retry for idempotent reads (`timeout`/`retry` options; override per call). Failures throw `FetchError` with a `kind` (`http`, `network`, `timeout`, `abort`, `parse`) — branch with `isHttpError`/`isTimeoutError`/`isNetworkError` from `@/lib/fetch`.
+- Never interpolate a raw id into a path: use `userEndpoint(id, suffix)` from `src/lib/auth/dal.ts` (UUID-validated, encoded) or `encodeURIComponent`.
+- Token refresh is built in: `src/proxy.ts` refreshes expired/missing access tokens before render, and `$fetch`'s `onError` refreshes + retries once on a 401 as a fallback. Both use `refreshSession()` from `src/lib/auth/refresh.ts`; do not duplicate.
 - Rewrite in `next.config.ts` maps `/server/:path*` → `${NEXT_PUBLIC_API_URL}/api/v1/:path*`.
-- Cookie propagation and Set-Cookie forwarding handled in `$fetch`; do not reimplement.
-- Server Actions use `$fetch.post<T>()` patterns (not raw `fetch`) and call `revalidateTag(CACHE_TAGS.PROFILE, 'max')` with tags from `src/constant/tags.ts`.
-- Client async state: prefer `useFetch` hook from `src/lib/fetch/use-fetch.ts` over custom loading/error logic.
-- Server Action error handling: `handleFetchError` from `src/lib/error.ts` normalizes failures to `T | IErrorResponse`;
+- Cookie propagation and Set-Cookie forwarding handled in `$fetch` — only the auth cookies (`AUTH_COOKIES` in `src/lib/auth/cookies.ts`) cross in either direction; do not reimplement. Do not set a default `Content-Type` on the instance: plain-object bodies get JSON automatically, and a preset header breaks `FormData` uploads.
+- Server Actions use `$fetch.post<T>()` patterns (not raw `fetch`) and call `updateTag(CACHE_TAGS.PROFILE)` (read-your-own-writes) with tags from `src/constant/tags.ts`.
+- Client async state: there is no custom fetch hook. Call the Server Action inside `useTransition` (or `useActionState`) and branch on the returned `result.success` — see `src/components/modules/auth/login-form.tsx`.
+- Server Action error handling: mutations `return handleFetchError(error)` from `src/lib/error.ts`, giving `T | IErrorResponse`. It never throws for expected failures (bad credentials, validation, 429, timeouts, outages); it only rethrows Next.js interrupts and bugs, and calls `unauthorized()` for a 401 outside `/auth/*`. `success` is a literal on both envelopes, so `if (result.success)` narrows.
+- Reads that pages render (`getAllUsers`, `getUserById`) throw; the Server Component catches `FetchError` only and must let interrupts (`redirect`, `forbidden`) propagate.
+- `getCurrentUser()` is best effort (null on any failure, for display); `verifySession()`/`requirePermission()` redirect only on 401/403 and rethrow outages so `error.tsx` renders instead of a redirect loop.
 
 ## Authorization (RBAC)
 
@@ -102,7 +107,7 @@ before touching anything permission-related. The short version:
 - Prefer named exports for components, hooks, and utilities instead of default-exporting everything.
 - For new features, place pages under the appropriate route-group folder in `src/app/` and keep feature-specific UI in `src/components/modules/`.
 - For mutations and server-side auth flows, use Server Actions in `src/app/actions/` and revalidate relevant tags from `src/constant/tags.ts`.
-- For client-side data fetching, prefer the shared `useFetch` hook from `src/lib/fetch/use-fetch.ts` over custom loading/error state.
+- For client-side mutations, use `useTransition`/`useActionState` with a Server Action that returns `T | IErrorResponse`; render reads on the server.
 - If a change touches auth, cookies, or token refresh, preserve the existing HttpOnly cookie flow in `src/lib/$fetch.ts`; do not move token handling to `localStorage`.
 - Reuse existing validation schemas and shared types instead of introducing ad hoc types or duplicate logic.
 

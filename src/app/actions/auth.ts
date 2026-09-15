@@ -2,6 +2,7 @@
 
 import { CACHE_TAGS } from '@/constant/tags'
 import { $fetch } from '@/lib/$fetch'
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@/lib/auth/cookies'
 import { handleFetchError } from '@/lib/error'
 import {
   TForgotPasswordInput,
@@ -13,7 +14,8 @@ import {
 } from '@/types/auth.types'
 import type { IErrorResponse, IResponse } from '@/types/response.types'
 import type { TUserResponse } from '@/types/user.types'
-import { revalidateTag } from 'next/cache'
+import { updateTag } from 'next/cache'
+import { cookies } from 'next/headers'
 
 const loginUser = async (
   data: TLoginInput
@@ -23,8 +25,7 @@ const loginUser = async (
       '/auth/login',
       { body: data }
     )
-
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
+    updateTag(CACHE_TAGS.PROFILE)
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -39,7 +40,6 @@ const registerUser = async (
       '/auth/register',
       { body: data }
     )
-
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -48,16 +48,15 @@ const registerUser = async (
 
 const resendVerificationCode = async (
   data: TResendVerificationCodeInput
-): Promise<IResponse> => {
+): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<
       IResponse,
       TResendVerificationCodeInput
     >('/auth/resend-verification-code', { body: data })
-
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
@@ -69,33 +68,39 @@ const verifyEmail = async (
       '/auth/verify-email',
       { body: data }
     )
-
     return response
   } catch (error) {
     return handleFetchError(error)
   }
 }
 
-const refreshToken = async (): Promise<IResponse> => {
+const refreshToken = async (): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>(
       '/auth/refresh-token'
     )
-
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
-const logoutUser = async (): Promise<IResponse> => {
+/**
+ * Always ends the session locally: if the backend call fails (expired token,
+ * outage), the auth cookies are still cleared so the user is not left
+ * half-signed-in. The result only tells the UI whether the backend agreed.
+ */
+const logoutUser = async (): Promise<IResponse | IErrorResponse> => {
   try {
     const { data: response } = await $fetch.post<IResponse>('/auth/logout')
-    revalidateTag(CACHE_TAGS.PROFILE, 'max')
-
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
+  } finally {
+    const cookieStore = await cookies()
+    cookieStore.delete(ACCESS_TOKEN_COOKIE)
+    cookieStore.delete(REFRESH_TOKEN_COOKIE)
+    updateTag(CACHE_TAGS.PROFILE)
   }
 }
 
@@ -103,11 +108,10 @@ const forgotPassword = async (
   data: TForgotPasswordInput
 ): Promise<IResponse | IErrorResponse> => {
   try {
-    const { data: response } = await $fetch.post<IResponse>(
-      '/auth/forgot-password',
-      { body: data }
-    )
-
+    const { data: response } = await $fetch.post<
+      IResponse,
+      TForgotPasswordInput
+    >('/auth/forgot-password', { body: data })
     return response
   } catch (error) {
     return handleFetchError(error)
@@ -116,16 +120,15 @@ const forgotPassword = async (
 
 const resendForgotPassword = async (
   data: TForgotPasswordInput
-): Promise<IResponse> => {
+): Promise<IResponse | IErrorResponse> => {
   try {
-    const { data: response } = await $fetch.post<IResponse>(
-      '/auth/resend-forgot-password',
-      { body: data }
-    )
-
+    const { data: response } = await $fetch.post<
+      IResponse,
+      TForgotPasswordInput
+    >('/auth/resend-forgot-password', { body: data })
     return response
   } catch (error) {
-    throw error
+    return handleFetchError(error)
   }
 }
 
@@ -133,11 +136,10 @@ const resetPassword = async (
   data: TResetPasswordInput
 ): Promise<IResponse | IErrorResponse> => {
   try {
-    const { data: response } = await $fetch.post<IResponse>(
-      '/auth/reset-password',
-      { body: data }
-    )
-
+    const { data: response } = await $fetch.post<
+      IResponse,
+      TResetPasswordInput
+    >('/auth/reset-password', { body: data })
     return response
   } catch (error) {
     return handleFetchError(error)

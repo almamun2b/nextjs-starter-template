@@ -46,7 +46,7 @@ export function UserStatusDialog({
 
   const handleSubmit = () => {
     startTransition(async () => {
-      // `updateUserStatus` throws on failure rather than returning an error union.
+      // Expected failures come back as a result; the catch covers anything else.
       try {
         const result = await updateUserStatus(user.id, {
           status: toStatusParam(status),
