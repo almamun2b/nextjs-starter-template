@@ -19,7 +19,9 @@ export default async function DashboardLayout({
       {/* `min-w-0` stops wide content (e.g. data tables) from widening the
           whole page instead of scrolling inside its own container. */}
       <SidebarInset className="min-w-0">
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-16">
+        {/* z-20: above any positioned page content (tables, cards) that
+            scrolls underneath, below overlays (popovers/dialogs are z-50). */}
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-16">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
