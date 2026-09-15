@@ -84,9 +84,11 @@ export function UsersToolbar({ params }: UsersToolbarProps) {
         searchPlaceholder="Search users..."
         actions={
           <Can permission={PERMISSIONS.USERS_CREATE}>
-            <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-              <PlusIcon className="size-3.5" />
-              Add user
+            {/* Icon-only on a narrow card (the toolbar is a size container),
+                so the search box keeps a usable width next to it. */}
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <PlusIcon />
+              <span className="sr-only @md:not-sr-only">Add user</span>
             </Button>
           </Can>
         }

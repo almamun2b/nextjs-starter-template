@@ -80,78 +80,88 @@ export function DataTableToolbar({
     onChange({ search: '', filters: cleared })
   }
 
+  // Lays out against the *card's* width via container queries, not the
+  // viewport: with the sidebar open, a 1024px screen leaves the table only
+  // ~780px, which viewport breakpoints would treat as desktop.
+  //
+  // - narrow:  [search ........ refresh add]
+  //            [filter   ] [filter   ]
+  //            [filter   ] [clear    ]
+  // - @xl:     [search ........ refresh add]
+  //            [filter] [filter] [filter] [clear]
+  // - @4xl:    [search] [filter] [filter] [filter] [clear] .... [refresh add]
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-3 border-b px-4 py-3 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:py-0',
-        className
-      )}
-    >
-      <div className="flex flex-1 flex-wrap items-center gap-2">
-        <div className="relative w-full max-w-xs">
+    <div className={cn('@container border-b', className)}>
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+        <div className="relative min-w-0 flex-1 @4xl:w-64 @4xl:flex-none">
           <SearchIcon
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-8 pl-8"
+            className="pl-8"
           />
         </div>
 
-        {filterConfigs.map((config) => (
-          <FilterDropdown
-            key={config.name}
-            name={config.name}
-            allLabel={config.allLabel}
-            options={config.options}
-            ariaLabel={config.ariaLabel}
-            className={config.className}
-            value={filters[config.name] ?? null}
-            onChange={handleFilterChange}
-          />
-        ))}
-
-        {/* Always occupies its slot — toggling visibility instead of mounting
-            keeps the toolbar from re-wrapping and shifting the table down. */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleClear}
-          aria-hidden={!hasActiveFilters}
-          tabIndex={hasActiveFilters ? undefined : -1}
-          className={cn(!hasActiveFilters && 'pointer-events-none invisible')}
-        >
-          <XIcon className="size-3.5" />
-          Clear
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-2">
-        {exportEnabled && onExport && (
-          <Button type="button" variant="outline" size="sm" onClick={onExport}>
-            Export
+        <div className="flex shrink-0 items-center gap-2 @4xl:order-last @4xl:ml-auto">
+          {exportEnabled && onExport && (
+            <Button type="button" variant="outline" onClick={onExport}>
+              Export
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() =>
+              onChange({ search, filters, action: { type: 'refresh' } })
+            }
+            disabled={isPending}
+            aria-label="Refresh"
+          >
+            <RefreshCwIcon className={cn(isPending && 'animate-spin')} />
           </Button>
+          {actions}
+        </div>
+
+        {(filterConfigs.length > 0 || hasActiveFilters) && (
+          <div className="grid w-full grid-cols-2 gap-2 @xl:flex @xl:flex-wrap @xl:items-center @4xl:w-auto @4xl:flex-nowrap">
+            {filterConfigs.map((config) => (
+              <FilterDropdown
+                key={config.name}
+                name={config.name}
+                allLabel={config.allLabel}
+                options={config.options}
+                ariaLabel={config.ariaLabel}
+                className={cn('w-full @xl:w-auto', config.className)}
+                value={filters[config.name] ?? null}
+                onChange={handleFilterChange}
+              />
+            ))}
+
+            {/* Always occupies its slot — toggling visibility instead of
+                mounting keeps the toolbar from re-wrapping and shifting the
+                table down. */}
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleClear}
+              aria-hidden={!hasActiveFilters}
+              tabIndex={hasActiveFilters ? undefined : -1}
+              className={cn(
+                'justify-self-start text-muted-foreground',
+                !hasActiveFilters && 'pointer-events-none invisible'
+              )}
+            >
+              <XIcon />
+              Clear
+            </Button>
+          </div>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          onClick={() =>
-            onChange({ search, filters, action: { type: 'refresh' } })
-          }
-          disabled={isPending}
-          aria-label="Refresh"
-        >
-          <RefreshCwIcon
-            className={cn('size-3.5', isPending && 'animate-spin')}
-          />
-        </Button>
-        {actions}
       </div>
     </div>
   )

@@ -47,9 +47,8 @@ export function FilterDropdown({
       onValueChange={(next) => onChange(name, next === ALL_VALUE ? null : next)}
     >
       <SelectTrigger
-        size="sm"
         aria-label={ariaLabel ?? allLabel}
-        className={cn('w-auto min-w-36', className)}
+        className={cn('min-w-0 @xl:min-w-32', className)}
       >
         <SelectValue />
       </SelectTrigger>
